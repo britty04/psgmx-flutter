@@ -1,4 +1,4 @@
-import 'dart:typed_data';
+import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:csv/csv.dart';
 import 'package:excel/excel.dart';
@@ -343,7 +343,7 @@ class TaskUploadService {
     try {
       await _supabase.from('audit_logs').insert(log.toMap());
     } catch (e) {
-      print('Failed to create audit log: $e');
+      debugPrint('Failed to create audit log: $e');
     }
   }
 

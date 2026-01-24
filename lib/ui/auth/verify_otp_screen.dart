@@ -80,7 +80,8 @@ class _VerifyOtpScreenState extends State<VerifyOtpScreen> {
 
     try {
       // First verify the OTP
-      await context.read<UserProvider>().verifyOtp(
+      final provider = context.read<UserProvider>();
+      await provider.verifyOtp(
             email: widget.email,
             otp: _otpController.text,
           );
@@ -88,7 +89,8 @@ class _VerifyOtpScreenState extends State<VerifyOtpScreen> {
       debugPrint('[VerifyOtpScreen] OTP verified, now setting password...');
 
       // Then complete signup with password
-      await context.read<UserProvider>().completeSignupWithPassword(
+      if (!mounted) return;
+      await provider.completeSignupWithPassword(
             email: widget.email,
             password: _passwordController.text,
           );
@@ -96,14 +98,14 @@ class _VerifyOtpScreenState extends State<VerifyOtpScreen> {
       debugPrint('[VerifyOtpScreen] Password set, account complete. Navigating to dashboard...');
 
       // Small delay to ensure auth state is updated
-      await Future.delayed(Duration(milliseconds: 500));
+      await Future.delayed(const Duration(milliseconds: 500));
 
-      if (mounted) {
-        debugPrint('[VerifyOtpScreen] Navigating to dashboard...');
-        // Navigate to dashboard on success
-        context.go('/dashboard');
-      }
+      if (!mounted) return;
+      debugPrint('[VerifyOtpScreen] Navigating to dashboard...');
+      // Navigate to dashboard on success
+      context.go('/dashboard');
     } catch (e) {
+      if (!mounted) return;
       debugPrint('[VerifyOtpScreen] Error: $e');
       setState(() {
         _error = e.toString();

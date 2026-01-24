@@ -135,7 +135,7 @@ class _RoleSimulationWidgetState extends State<RoleSimulationWidget> {
       ),
       selected: isActive,
       onSelected: (_) => _selectMode(mode, needsTeam),
-      selectedColor: color.withOpacity(0.3),
+      selectedColor: color.withValues(alpha: 0.3),
       checkmarkColor: color,
     );
   }
@@ -147,7 +147,7 @@ class _RoleSimulationWidgetState extends State<RoleSimulationWidget> {
         border: OutlineInputBorder(),
         isDense: true,
       ),
-      value: _selectedTeamId,
+      initialValue: _selectedTeamId,
       items: _getTeamOptions(),
       onChanged: (value) {
         setState(() {
@@ -272,7 +272,7 @@ class RoleIndicatorBadge extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
       decoration: BoxDecoration(
-        color: isSimulating ? Colors.amber.shade100 : roleColor.withOpacity(0.1),
+        color: isSimulating ? Colors.amber.shade100 : roleColor.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(12),
         border: Border.all(
           color: isSimulating ? Colors.amber.shade700 : roleColor,

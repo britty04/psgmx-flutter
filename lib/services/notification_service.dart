@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../models/notification.dart';
@@ -332,7 +333,7 @@ Output ONLY the message text, nothing else.
           .update({'is_active': false})
           .lt('valid_until', DateTime.now().toIso8601String());
     } catch (e) {
-      print('Failed to cleanup notifications: $e');
+      debugPrint('Failed to cleanup notifications: $e');
     }
   }
 }

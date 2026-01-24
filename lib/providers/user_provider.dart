@@ -1,6 +1,5 @@
 import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import '../core/app_router.dart';
 import '../models/app_user.dart';
 import '../services/auth_service.dart';
 
@@ -13,23 +12,57 @@ import '../services/auth_service.dart';
 /// - Persist session across app restarts
 class UserProvider with ChangeNotifier {
   final AuthService _authService;
-
   AppUser? _currentUser;
   bool _isLoading = true;
   bool _initComplete = false;
+  
+  // Simulation Mode for Placement Reps
+  UserRole? _simulatedRole;
 
-  UserProvider({required AuthService authService})
-      : _authService = authService {
+  UserProvider({required AuthService authService}) : _authService = authService {
     _init();
   }
 
   AppUser? get currentUser => _currentUser;
   bool get isLoading => _isLoading;
   bool get initComplete => _initComplete;
+  
+  bool get isSimulating => _simulatedRole != null;
+  UserRole? get simulatedRole => _simulatedRole;
 
-  bool get isTeamLeader => _currentUser?.isTeamLeader ?? false;
-  bool get isCoordinator => _currentUser?.isCoordinator ?? false;
-  bool get isPlacementRep => _currentUser?.isPlacementRep ?? false;
+  // EFFECTIVE ROLES (Use these for UI logic)
+  // If simulating, strictly return simulation status.
+  // If not simulating, return actual role.
+  bool get isStudent => _simulatedRole != null 
+      ? _simulatedRole == UserRole.student 
+      : (_currentUser?.isStudent ?? false);
+
+  bool get isTeamLeader => _simulatedRole != null 
+      ? _simulatedRole == UserRole.teamLeader 
+      : (_currentUser?.isTeamLeader ?? false);
+
+  bool get isCoordinator => _simulatedRole != null 
+      ? _simulatedRole == UserRole.coordinator 
+      : (_currentUser?.isCoordinator ?? false);
+      
+  bool get isPlacementRep => _simulatedRole != null 
+      ? _simulatedRole == UserRole.placementRep 
+      : (_currentUser?.isPlacementRep ?? false);
+
+  // True Admin Access (Never simulated away)
+  bool get hasActualAdminAccess => _currentUser?.hasAdminAccess ?? false;
+  bool get isActualPlacementRep => _currentUser?.isPlacementRep ?? false;
+
+  void setSimulationRole(UserRole? role) {
+    if (!isActualPlacementRep) return; // Security check
+    _simulatedRole = role;
+    notifyListeners();
+  }
+  
+  // Public retry method for Splash Screen Failsafe
+  void retryInit() {
+    _init(); 
+  }
 
   void _init() {
     debugPrint('[UserProvider] Initializing...');
@@ -52,26 +85,32 @@ class UserProvider with ChangeNotifier {
         try {
           debugPrint(
               '[UserProvider] Fetching user document for: ${supabaseUser.email}');
+          
+          // Add timeout to prevent infinite loading screen
           _currentUser = await _authService.ensureUserDocument(
             supabaseUser.id,
             supabaseUser.email!,
-          );
+          ).timeout(const Duration(seconds: 5), onTimeout: () {
+             debugPrint('[UserProvider] User fetch timed out');
+             throw Exception('Connection timed out');
+          });
+          
           debugPrint(
               '[UserProvider] User document loaded: ${_currentUser?.email}');
         } catch (e) {
           debugPrint('[UserProvider] Error fetching user document: $e');
           // Still mark init as complete even if user fetch fails
+          _currentUser = null;
           _isLoading = false;
           _initComplete = true;
           notifyListeners();
 
-          // Try to sign out
+          // Try to sign out to prevent stuck state
           try {
             await _authService.signOut();
           } catch (e) {
             debugPrint('[UserProvider] Error signing out: $e');
           }
-          _currentUser = null;
           return;
         }
       } else {
@@ -89,9 +128,6 @@ class UserProvider with ChangeNotifier {
       debugPrint(
           '[UserProvider] Initialization complete: initComplete=$_initComplete, hasUser=${_currentUser != null}');
       notifyListeners();
-
-      // Trigger router refresh to evaluate redirect logic
-      appRouter.refresh();
 
       // Now listen for ongoing auth state changes
       _listenToAuthStateChanges();
@@ -122,7 +158,6 @@ class UserProvider with ChangeNotifier {
           _currentUser = null;
         }
         notifyListeners();
-        appRouter.refresh();
       },
       onError: (e) {
         debugPrint('[UserProvider] Auth stream error: $e');

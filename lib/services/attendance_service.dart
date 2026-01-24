@@ -1,4 +1,5 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:flutter/foundation.dart';
 import '../models/attendance.dart';
 import '../models/attendance_day.dart';
 import '../models/audit_log.dart';
@@ -360,7 +361,7 @@ class AttendanceService {
       await _supabase.from('audit_logs').insert(log.toMap());
     } catch (e) {
       // Silent fail - audit logs are important but not critical
-      print('Failed to create audit log: $e');
+      debugPrint('Failed to create audit log: $e');
     }
   }
 

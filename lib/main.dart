@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:provider/provider.dart';
+import 'package:go_router/go_router.dart';
 import 'core/supabase_config.dart';
 import 'core/app_router.dart';
 import 'providers/user_provider.dart';
@@ -42,14 +43,38 @@ class PsgMxApp extends StatelessWidget {
           create: (_) => UserProvider(authService: authService),
         ),
       ],
-      child: MaterialApp.router(
-        title: 'PSG MCA Prep',
-        debugShowCheckedModeBanner: false,
-        theme: AppTheme.light(),
-        darkTheme: AppTheme.dark(),
-        themeMode: ThemeMode.system,
-        routerConfig: appRouter,
-      ),
+      child: const PsgMxAppInner(),
+    );
+  }
+}
+
+class PsgMxAppInner extends StatefulWidget {
+  const PsgMxAppInner({super.key});
+
+  @override
+  State<PsgMxAppInner> createState() => _PsgMxAppInnerState();
+}
+
+class _PsgMxAppInnerState extends State<PsgMxAppInner> {
+  late final GoRouter _router;
+
+  @override
+  void initState() {
+    super.initState();
+    // Access provider via context inside initState (listen: false)
+    final userProvider = Provider.of<UserProvider>(context, listen: false);
+    _router = AppRouter.createRouter(userProvider);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return MaterialApp.router(
+      title: 'PSG MCA Prep',
+      debugShowCheckedModeBanner: false,
+      theme: AppTheme.light(),
+      darkTheme: AppTheme.dark(),
+      themeMode: ThemeMode.system,
+      routerConfig: _router,
     );
   }
 }

@@ -1,6 +1,5 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../models/app_user.dart';
-import '../models/attendance.dart';
 
 /// A facade service specifically designed to support the UI's needs
 /// aggregating underlying Supabase calls.
@@ -175,6 +174,77 @@ class SupabaseDbService {
           timestamp: DateTime.parse(row['created_at']),
           markedBy: row['marked_by'],
         )).toList());
+  }
+
+  // ==========================================
+  // Bulk & Advanced Operations
+  // ==========================================
+
+  Future<int> bulkPublishTasks(List<CompositeTask> tasks) async {
+    final user = _supabase.auth.currentUser;
+    if (user == null) throw Exception("Not authenticated");
+
+    final List<Map<String, dynamic>> rows = [];
+
+    for (var task in tasks) {
+      if (task.leetcodeUrl.isNotEmpty) {
+        rows.add({
+          'date': task.date,
+          'topic_type': 'leetcode',
+          'title': 'Daily LeetCode',
+          'reference_link': task.leetcodeUrl,
+          'uploaded_by': user.id,
+        });
+      }
+      if (task.csTopic.isNotEmpty) {
+        rows.add({
+          'date': task.date,
+          'topic_type': 'core',
+          'title': task.csTopic,
+          'subject': task.csTopicDescription,
+          'uploaded_by': user.id,
+        });
+      }
+    }
+
+    if (rows.isEmpty) return 0;
+    
+    await _supabase.from('daily_tasks').upsert(rows, onConflict: 'date, topic_type, title');
+    return rows.length;
+  }
+
+  Future<Map<String, dynamic>> getPlacementStats() async {
+    // 1. Total Students check (using a post-filter or exact query if possible)
+    final allUsers = await _supabase.from('users').select('roles');
+    int studentCount = 0;
+    for(var u in allUsers) {
+      if(u['roles']['isStudent'] == true) studentCount++;
+    }
+
+    // 2. Count today's attendance
+    final today = DateTime.now().toIso8601String().split('T')[0];
+    final attendanceCount = await _supabase
+      .from('attendance')
+      .count()
+      .eq('date', today)
+      .eq('status', 'PRESENT');
+
+    return {
+      'total_students': studentCount,
+      'today_present': attendanceCount,
+    };
+  }
+
+  Future<List<AppUser>> getAllStudents() async {
+    final response = await _supabase
+        .from('users')
+        .select()
+        .order('reg_no'); 
+    
+    return (response as List)
+      .map((e) => AppUser.fromMap(e))
+      .where((u) => u.isStudent)
+      .toList();
   }
 }
 
