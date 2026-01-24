@@ -65,6 +65,11 @@ class AppUser {
   final UserRoles roles;
   final DateTime createdAt;
   final DateTime updatedAt;
+  
+  // New Fields
+  final String? leetcodeUsername;
+  final DateTime? dob;
+  final bool birthdayNotificationsEnabled;
 
   AppUser({
     required this.uid,
@@ -76,6 +81,9 @@ class AppUser {
     required this.roles,
     DateTime? createdAt,
     DateTime? updatedAt,
+    this.leetcodeUsername,
+    this.dob,
+    this.birthdayNotificationsEnabled = true,
   })  : createdAt = createdAt ?? DateTime.now(),
         updatedAt = updatedAt ?? DateTime.now();
 
@@ -87,7 +95,9 @@ class AppUser {
   bool get hasAdminAccess => roles.hasAnyAdminRole();
 
   factory AppUser.fromMap(Map<String, dynamic> data) {
-    final rolesData = data['roles'];
+    var rolesData = data['roles'];
+    rolesData ??= const UserRoles().toJson();
+    
     final roles = rolesData is Map<String, dynamic>
         ? UserRoles.fromJson(rolesData)
         : const UserRoles();
@@ -95,20 +105,19 @@ class AppUser {
     return AppUser(
       uid: data['id'] ?? '',
       email: data['email'] ?? '',
-      regNo: data['reg_no'] ?? data['reg_number'] ?? data['regNo'] ?? '',
-      name: data['name'] ?? data['full_name'] ?? '',
-      teamId: data['team_id'] ?? data['teamId'],
+      regNo: data['reg_no'] ?? '',
+      name: data['name'] ?? '',
+      teamId: data['team_id'],
       batch: data['batch'] ?? 'G1',
       roles: roles,
-      createdAt: data['created_at'] != null
-          ? DateTime.parse(data['created_at'])
-          : DateTime.now(),
-      updatedAt: data['updated_at'] != null
-          ? DateTime.parse(data['updated_at'])
-          : DateTime.now(),
+      createdAt: data['created_at'] != null ? DateTime.parse(data['created_at']) : null,
+      updatedAt: data['updated_at'] != null ? DateTime.parse(data['updated_at']) : null,
+      leetcodeUsername: data['leetcode_username'],
+      dob: data['dob'] != null ? DateTime.tryParse(data['dob'].toString()) : null,
+      birthdayNotificationsEnabled: data['birthday_notifications_enabled'] ?? true,
     );
   }
-
+  
   // Alias for fromMap
   factory AppUser.fromJson(Map<String, dynamic> data) => AppUser.fromMap(data);
 
@@ -123,31 +132,33 @@ class AppUser {
       'roles': roles.toJson(),
       'created_at': createdAt.toIso8601String(),
       'updated_at': updatedAt.toIso8601String(),
+      'leetcode_username': leetcodeUsername,
+      'dob': dob?.toIso8601String().split('T')[0],
+      'birthday_notifications_enabled': birthdayNotificationsEnabled,
     };
   }
 
   AppUser copyWith({
-    String? uid,
-    String? email,
-    String? regNo,
     String? name,
-    String? teamId,
-    String? batch,
     UserRoles? roles,
-    DateTime? createdAt,
-    DateTime? updatedAt,
+    String? leetcodeUsername,
+    DateTime? dob,
+    bool? birthdayNotificationsEnabled,
+    String? teamId,
   }) {
     return AppUser(
-      uid: uid ?? this.uid,
-      email: email ?? this.email,
-      regNo: regNo ?? this.regNo,
+      uid: uid,
+      email: email,
+      regNo: regNo,
       name: name ?? this.name,
       teamId: teamId ?? this.teamId,
-      batch: batch ?? this.batch,
+      batch: batch,
       roles: roles ?? this.roles,
-      createdAt: createdAt ?? this.createdAt,
-      updatedAt: updatedAt ?? this.updatedAt,
+      createdAt: createdAt,
+      updatedAt: DateTime.now(),
+      leetcodeUsername: leetcodeUsername ?? this.leetcodeUsername,
+      dob: dob ?? this.dob,
+      birthdayNotificationsEnabled: birthdayNotificationsEnabled ?? this.birthdayNotificationsEnabled,
     );
   }
 }
-

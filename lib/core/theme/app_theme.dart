@@ -1,133 +1,128 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'app_dimens.dart';
 
 class AppTheme {
-  // PSG Blue Base
-  static const Color psgBlue = Color(0xFF003366); 
-  static const Color psgAccent = Color(0xFF0055A4);
+  // PSGMX Brand Colors
+  static const Color psgPrimary = Color(0xFFFF6600); // Warm Modern Orange
+  static const Color psgAccent = Color(0xFFFF9933);
+  static const Color textDark = Color(0xFF1F2937);
+  static const Color textLight = Color(0xFFF9FAFB);
 
   static ThemeData light() {
     final colorScheme = ColorScheme.fromSeed(
-      seedColor: psgBlue,
+      seedColor: psgPrimary,
       brightness: Brightness.light,
-      primary: psgBlue,
+      primary: psgPrimary,
       onPrimary: Colors.white,
       secondary: psgAccent,
-      surfaceContainerLow: const Color(0xFFF5F7FA), // Light grey background for app
+      surface: Colors.white, // Pure white
+      surfaceContainerLow: const Color(0xFFF3F4F6), 
+      onSurface: textDark,
+      outline: const Color(0xFFE5E7EB),
     );
 
-    return ThemeData(
-      useMaterial3: true,
-      colorScheme: colorScheme,
-      scaffoldBackgroundColor: const Color(0xFFF5F7FA), // Boring professional background
-      appBarTheme: AppBarTheme(
-        backgroundColor: Colors.white,
-        foregroundColor: Colors.black87,
-        elevation: 0,
-        centerTitle: false,
-        scrolledUnderElevation: 2,
-        titleTextStyle: GoogleFonts.inter(
-          fontSize: 20,
-          fontWeight: FontWeight.w600,
-          color: Colors.black87,
-        ),
-      ),
-      cardTheme: CardThemeData(
-        color: Colors.white,
-        elevation: 1,
-        margin: EdgeInsets.zero,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(12),
-          side: const BorderSide(color: Color(0xFFE0E0E0), width: 1),
-        ),
-      ),
-      filledButtonTheme: FilledButtonThemeData(
-        style: FilledButton.styleFrom(
-          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-          textStyle: GoogleFonts.inter(fontWeight: FontWeight.w600),
-        ),
-      ),
-      outlinedButtonTheme: OutlinedButtonThemeData(
-        style: OutlinedButton.styleFrom(
-          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-          textStyle: GoogleFonts.inter(fontWeight: FontWeight.w600),
-        ),
-      ),
-      inputDecorationTheme: InputDecorationTheme(
-        filled: true,
-        fillColor: Colors.white,
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(8),
-          borderSide: const BorderSide(color: Color(0xFFE0E0E0)),
-        ),
-        enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(8),
-          borderSide: const BorderSide(color: Color(0xFFE0E0E0)),
-        ),
-        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-      ),
-      textTheme: GoogleFonts.interTextTheme(),
-      navigationBarTheme: NavigationBarThemeData(
-        elevation: 2,
-        backgroundColor: Colors.white,
-        surfaceTintColor: Colors.white,
-        indicatorColor: psgBlue.withValues(alpha: 0.1),
-        labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
-      ),
-    );
+    return _buildTheme(colorScheme);
   }
 
   static ThemeData dark() {
     final colorScheme = ColorScheme.fromSeed(
-      seedColor: psgBlue,
+      seedColor: psgPrimary,
       brightness: Brightness.dark,
-      surface: const Color(0xFF121212),
+      surface: const Color(0xFF121212), // Dark grey elevation
+      onSurface: textLight,
+      outline: const Color(0xFF333333),
     );
+
+    return _buildTheme(colorScheme);
+  }
+
+  static ThemeData _buildTheme(ColorScheme colorScheme) {
+    final isDark = colorScheme.brightness == Brightness.dark;
 
     return ThemeData(
       useMaterial3: true,
       colorScheme: colorScheme,
-      scaffoldBackgroundColor: const Color(0xFF121212),
+      scaffoldBackgroundColor: isDark ? const Color(0xFF000000) : Colors.white,
+      
+      // Typography
+      textTheme: GoogleFonts.interTextTheme(
+        isDark ? ThemeData.dark().textTheme : ThemeData.light().textTheme,
+      ).apply(
+        bodyColor: colorScheme.onSurface,
+        displayColor: colorScheme.onSurface,
+      ),
+
+      // App Bar
       appBarTheme: AppBarTheme(
-        backgroundColor: const Color(0xFF1E1E1E),
-        foregroundColor: Colors.white,
+        backgroundColor: colorScheme.surface,
+        foregroundColor: colorScheme.onSurface,
         elevation: 0,
+        scrolledUnderElevation: 2,
         centerTitle: false,
         titleTextStyle: GoogleFonts.inter(
-          fontSize: 20,
+          fontSize: 18,
           fontWeight: FontWeight.w600,
-          color: Colors.white,
+          color: colorScheme.onSurface,
         ),
       ),
-      cardTheme: CardThemeData(
-        color: const Color(0xFF1E1E1E),
-        elevation: 0,
-        margin: EdgeInsets.zero, // Reset default margin
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(12),
-          side: const BorderSide(color: Color(0xFF333333), width: 1),
-        ),
-      ),
+
+      // Buttons
       filledButtonTheme: FilledButtonThemeData(
         style: FilledButton.styleFrom(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+          padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg, vertical: AppSpacing.md),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppRadius.md)),
           textStyle: GoogleFonts.inter(fontWeight: FontWeight.w600),
+          elevation: 0,
         ),
       ),
+
+      // Cards
+      cardTheme: CardThemeData(
+        color: colorScheme.surface,
+        elevation: 0, // We will handle elevation via shadows in PremiumCard
+        margin: EdgeInsets.zero,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(AppRadius.md),
+          side: BorderSide(
+            color: colorScheme.outline.withValues(alpha: 0.5),
+            width: 1,
+          ),
+        ),
+      ),
+
+      // Navigation Bar
+      navigationBarTheme: NavigationBarThemeData(
+        backgroundColor: colorScheme.surface,
+        elevation: 0,
+        height: 70,
+        indicatorColor: colorScheme.primary.withValues(alpha: 0.1),
+        labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
+        iconTheme: WidgetStateProperty.resolveWith((states) {
+          if (states.contains(WidgetState.selected)) {
+            return IconThemeData(color: colorScheme.primary);
+          }
+          return IconThemeData(color: colorScheme.onSurfaceVariant);
+        }),
+      ),
+
+      // Inputs
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
-        fillColor: const Color(0xFF1E1E1E),
+        fillColor: isDark ? const Color(0xFF1F2937) : Colors.white,
+        contentPadding: const EdgeInsets.all(AppSpacing.md),
         border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(8),
-          borderSide: const BorderSide(color: Color(0xFF333333)),
+          borderRadius: BorderRadius.circular(AppRadius.md),
+          borderSide: BorderSide(color: colorScheme.outline),
         ),
-      ),
-      textTheme: GoogleFonts.interTextTheme(ThemeData.dark().textTheme),
-      navigationBarTheme: NavigationBarThemeData(
-        backgroundColor: const Color(0xFF1E1E1E),
-        indicatorColor: psgBlue.withValues(alpha: 0.4),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(AppRadius.md),
+          borderSide: BorderSide(color: colorScheme.outline),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(AppRadius.md),
+          borderSide: BorderSide(color: colorScheme.primary, width: 2),
+        ),
       ),
     );
   }

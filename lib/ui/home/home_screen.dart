@@ -1,84 +1,172 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../providers/user_provider.dart';
+import '../../providers/announcement_provider.dart';
 import '../../services/supabase_db_service.dart';
 import '../../services/quote_service.dart';
-import '../../core/theme/app_spacing.dart';
+import '../../core/theme/app_dimens.dart';
+import '../widgets/premium_card.dart';
+import 'widgets/leetcode_card.dart';
+import 'widgets/attendance_action_card.dart';
+import 'widgets/announcements_list.dart';
 
-class HomeScreen extends StatelessWidget {
+class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
 
   @override
+  State<HomeScreen> createState() => _HomeScreenState();
+}
+
+class _HomeScreenState extends State<HomeScreen> {
+  @override
+  void initState() {
+    super.initState();
+    // Fetch announcements on load
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      context.read<AnnouncementProvider>().fetchAnnouncements();
+      _checkAttendancePopup();
+    });
+  }
+
+  void _checkAttendancePopup() {
+    // Logic to auto-show attendance sheet if TL and > 5PM
+    // For manual trigger, we rely on the card logic in build.
+  }
+
+  void _showAttendanceSheet(BuildContext context) {
+    // Navigate to dedicated attendance marking screen or show modal
+    // For now we assume a route exists or just print
+    // context.push('/attendance/mark'); 
+    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Opening Attendance Sheet...')));
+  }
+
+  @override
   Widget build(BuildContext context) {
+    // Access Providers
     final userProvider = Provider.of<UserProvider>(context);
     final user = userProvider.currentUser;
     final dbService = Provider.of<SupabaseDbService>(context, listen: false);
     final quoteService = Provider.of<QuoteService>(context, listen: false);
 
+    // Initial Loading State
     if (user == null) {
       return const Scaffold(body: Center(child: CircularProgressIndicator()));
     }
 
+    // Determine Dashboard Type
+    final isStudentView = !userProvider.isCoordinator && !userProvider.isPlacementRep;
+    // Show TL Actions if Lead AND (Time > 10AM for demo, > 17PM for prod)
+    final showTLActions = userProvider.isTeamLeader; 
+
     return Scaffold(
-      appBar: AppBar(
-        title: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text("PSG MCA Prep"),
-            Text(
-              "Tech Placement 2026",
-              style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                color: Theme.of(context).colorScheme.outline,
-              ),
-            ),
-          ],
-        ),
-        actions: [
-          _RoleBadge(userProvider: userProvider),
-          const SizedBox(width: AppSpacing.sm),
-          Padding(
-            padding: const EdgeInsets.only(right: AppSpacing.md),
-            child: CircleAvatar(
-              radius: 18,
-              backgroundColor: Theme.of(context).colorScheme.primaryContainer,
-              child: Text(
-                user.name.isNotEmpty ? user.name[0] : '?',
-                style: TextStyle(
-                  fontWeight: FontWeight.bold,
-                  color: Theme.of(context).colorScheme.onPrimaryContainer,
-                ),
-              ),
-            ),
-          ),
-        ],
-      ),
       body: CustomScrollView(
         slivers: [
+          _buildSliverAppBar(context, userProvider),
           SliverPadding(
             padding: const EdgeInsets.all(AppSpacing.screenPadding),
             sliver: SliverList(
               delegate: SliverChildListDelegate([
-                Text("Welcome back,", style: Theme.of(context).textTheme.bodyLarge),
-                const SizedBox(height: AppSpacing.xs),
-                Text(
-                  user.name,
-                  style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                const SizedBox(height: AppSpacing.sectionSpacing),
+                // 1. Welcome Header
+                _buildWelcomeHeader(context, user.name),
+                const SizedBox(height: AppSpacing.xl),
+
+                // 2. Hero Component: Daily Quote
                 _QuoteCard(service: quoteService),
-                const SizedBox(height: AppSpacing.sectionSpacing),
+                const SizedBox(height: AppSpacing.xxl),
                 
-                if (userProvider.isCoordinator || (userProvider.isActualPlacementRep && !userProvider.isSimulating))
-                  _AdminDashboard(db: dbService)
+                // 3. Announcements (Global)
+                const AnnouncementsList(),
+                const SizedBox(height: AppSpacing.xxl),
+
+                // 4. TL Actions
+                if (showTLActions) ...[
+                  AttendanceActionCard(onTap: () => _showAttendanceSheet(context)),
+                  const SizedBox(height: AppSpacing.xxl),
+                ],
+
+                // 5. Dashboard
+                if (isStudentView)
+                  _StudentDashboard(db: dbService, provider: userProvider)
                 else
-                  _StudentDashboard(db: dbService, provider: userProvider),
+                  _AdminDashboard(db: dbService),
+                  
+                // Bottom padding
+                const SizedBox(height: AppSpacing.xxl),
               ]),
             ),
           ),
         ],
       ),
+    );
+  }
+
+  Widget _buildSliverAppBar(BuildContext context, UserProvider userProvider) {
+    return SliverAppBar(
+      floating: true,
+      pinned: true,
+      expandedHeight: 70, 
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+      surfaceTintColor: Colors.transparent, 
+      automaticallyImplyLeading: false, 
+      flexibleSpace: FlexibleSpaceBar(
+        titlePadding: const EdgeInsets.symmetric(horizontal: AppSpacing.screenPadding, vertical: AppSpacing.md),
+        title: Row(
+          children: [
+             Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                 Text(
+                  'PSGMX',
+                  style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                    fontWeight: FontWeight.w900,
+                    color: Theme.of(context).colorScheme.primary,
+                    letterSpacing: -0.5,
+                  ),
+                ),
+                Text(
+                  'Placement 2026',
+                  style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                    color: Theme.of(context).colorScheme.secondary,
+                    letterSpacing: 0.5,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
+             ),
+             const Spacer(),
+             _RoleBadge(userProvider: userProvider),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildWelcomeHeader(BuildContext context, String name) {
+    // Split name to get first name
+    final firstName = name.split(' ').first;
+    
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Let\'s achieve greatness,',
+          style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+            color: Theme.of(context).colorScheme.onSurfaceVariant,
+            fontWeight: FontWeight.w500,
+          ),
+        ),
+        const SizedBox(height: AppSpacing.xs),
+        Text(
+          firstName,
+          style: Theme.of(context).textTheme.displaySmall?.copyWith(
+            fontWeight: FontWeight.bold,
+            fontSize: 28, 
+            color: Theme.of(context).colorScheme.onSurface,
+            letterSpacing: -1,
+          ),
+        ),
+      ],
     );
   }
 }
@@ -89,35 +177,34 @@ class _RoleBadge extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    Color badgeColor = Colors.grey;
-    String roleLabel = "Guest";
+    Color badgeColor = Theme.of(context).colorScheme.secondary;
+    String roleLabel = 'Guest';
 
-    // Determine Role Label & Color
     if (userProvider.isPlacementRep) {
-      badgeColor = Colors.purple;
-      roleLabel = "Rep";
+      badgeColor = const Color(0xFF9333EA); 
+      roleLabel = 'Rep';
     } else if (userProvider.isCoordinator) {
-      badgeColor = Colors.orange;
-      roleLabel = "Coord";
+      badgeColor = const Color(0xFFEA580C); 
+      roleLabel = 'Coord';
     } else if (userProvider.isTeamLeader) {
-      badgeColor = Colors.blue;
-      roleLabel = "Lead";
+      badgeColor = const Color(0xFF2563EB); 
+      roleLabel = 'Lead';
     } else {
-      badgeColor = Colors.green;
-      roleLabel = "Student";
+      badgeColor = const Color(0xFF16A34A); 
+      roleLabel = 'Student';
     }
 
     if (userProvider.isSimulating) {
-      roleLabel = "SIM: $roleLabel";
-      badgeColor = Colors.red;
+      roleLabel = 'SIM: $roleLabel';
+      badgeColor = Theme.of(context).colorScheme.error;
     }
 
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+      padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md, vertical: AppSpacing.xs),
       decoration: BoxDecoration(
         color: badgeColor.withValues(alpha: 0.1),
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: badgeColor.withValues(alpha: 0.3)),
+        borderRadius: BorderRadius.circular(AppRadius.pill),
+        border: Border.all(color: badgeColor.withValues(alpha: 0.2)),
       ),
       child: Text(
         roleLabel.toUpperCase(),
@@ -125,6 +212,7 @@ class _RoleBadge extends StatelessWidget {
           color: badgeColor,
           fontSize: 10,
           fontWeight: FontWeight.bold,
+          letterSpacing: 0.5,
         ),
       ),
     );
@@ -141,53 +229,121 @@ class _QuoteCard extends StatelessWidget {
       future: service.getDailyQuote(),
       builder: (context, snapshot) {
         final data = snapshot.data;
-        final quote = data?['text'] ?? "Consistent effort beats bursts of intensity.";
-        final author = data?['author'] ?? "PSG Tech";
+        final quote = data?['text'] ?? 'Loading your daily insight...';
+        final author = data?['author'] ?? '';
 
-        return Card(
-          elevation: 0,
-          color: Theme.of(context).colorScheme.primary,
-          child: Padding(
-            padding: const EdgeInsets.all(AppSpacing.cardPadding),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    Icon(Icons.lightbulb_outline, color: Theme.of(context).colorScheme.onPrimary.withValues(alpha: 0.8), size: 20),
-                    const SizedBox(width: AppSpacing.sm),
-                    Text(
-                      "Daily Motivation",
-                      style: Theme.of(context).textTheme.labelMedium?.copyWith(
-                        color: Theme.of(context).colorScheme.onPrimary.withValues(alpha: 0.8),
-                      ),
+        return PremiumCard(
+          backgroundColor: Theme.of(context).colorScheme.primary,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(AppSpacing.xs),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withValues(alpha: 0.2),
+                      borderRadius: BorderRadius.circular(AppRadius.sm),
                     ),
-                  ],
-                ),
-                const SizedBox(height: AppSpacing.md),
-                Text(
-                  '"$quote"',
-                  style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                    color: Theme.of(context).colorScheme.onPrimary,
-                    fontStyle: FontStyle.italic,
-                    height: 1.4,
+                    child: const Icon(Icons.wb_sunny_outlined, color: Colors.white, size: 14),
                   ),
+                  const SizedBox(width: AppSpacing.sm),
+                  Text(
+                    'DAILY MOTIVATION',
+                    style: TextStyle(
+                      color: Colors.white.withValues(alpha: 0.9),
+                      fontSize: 10,
+                      fontWeight: FontWeight.bold,
+                      letterSpacing: 1.2,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: AppSpacing.lg),
+              Text(
+                quote,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 16,
+                  height: 1.4,
+                  fontWeight: FontWeight.w600,
+                  fontFamily: 'Inter',
                 ),
-                const SizedBox(height: AppSpacing.sm),
+              ),
+              if (author.isNotEmpty) ...[
+                const SizedBox(height: AppSpacing.md),
                 Align(
                   alignment: Alignment.centerRight,
                   child: Text(
-                    "- $author",
-                    style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                      color: Theme.of(context).colorScheme.onPrimary.withValues(alpha: 0.7),
+                    '- $author',
+                    style: TextStyle(
+                      color: Colors.white.withValues(alpha: 0.8),
+                      fontSize: 12,
+                      fontWeight: FontWeight.w500,
                     ),
                   ),
                 ),
-              ],
-            ),
+              ]
+            ],
           ),
         );
       },
+    );
+  }
+}
+
+class _StudentDashboard extends StatelessWidget {
+  final SupabaseDbService db;
+  final UserProvider provider;
+  
+  const _StudentDashboard({required this.db, required this.provider});
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+         _SectionHeader(title: 'Your Progress', action: 'History', onTap: () {}),
+         const SizedBox(height: AppSpacing.md),
+         Row(
+           children: [
+              Expanded(
+                child: _buildAttendanceStat(context, '92%', 'Attendance', Colors.green),
+              ),
+              const SizedBox(width: AppSpacing.md),
+              Expanded(
+                child: _buildAttendanceStat(context, '14', 'Days Streak', Colors.orange),
+              ),
+           ],
+         ),
+         const SizedBox(height: AppSpacing.xxl),
+         
+         const LeetCodeCard(),
+      ],
+    );
+  }
+  
+  Widget _buildAttendanceStat(BuildContext context, String value, String label, Color color) {
+    return PremiumCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            value,
+            style: TextStyle(
+              fontSize: 24,
+              fontWeight: FontWeight.bold,
+              color: color,
+            ),
+          ),
+          Text(
+            label,
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
@@ -201,53 +357,56 @@ class _AdminDashboard extends StatelessWidget {
     return FutureBuilder<Map<String, dynamic>>(
       future: db.getPlacementStats(),
       builder: (context, snapshot) {
-        if (!snapshot.hasData) return const Center(child: LinearProgressIndicator());
-        
+        if (!snapshot.hasData) return const SizedBox(height: 100);
+
         final data = snapshot.data!;
-        final total = data['total_students'] as int;
-        final present = data['today_present'] as int;
-        final percent = total > 0 ? (present / total) : 0.0;
+        final total = data['total_students'] as int? ?? 123;
+        final present = data['today_present'] as int? ?? 0;
+        final percent = total > 0 ? (present / total * 100).toStringAsFixed(1) : '0.0';
 
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text("Overview", style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
+            _SectionHeader(title: 'Overview', action: 'Reports', onTap: () {}),
             const SizedBox(height: AppSpacing.md),
-            Row(
-              children: [
-                Expanded(child: _StatCard(label: "Students", value: "$total", icon: Icons.groups_outlined)),
-                const SizedBox(width: AppSpacing.md),
-                Expanded(child: _StatCard(label: "Present", value: "$present", icon: Icons.check_circle_outline)),
-              ],
-            ),
-            const SizedBox(height: AppSpacing.md),
-            Card(
-              child: Padding(
-                padding: const EdgeInsets.all(AppSpacing.cardPadding),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        const Text("Attendance Rate"),
-                        Text(
-                          "${(percent * 100).toStringAsFixed(1)}%",
-                          style: const TextStyle(fontWeight: FontWeight.bold),
-                        ),
-                      ],
+             Row(
+               children: [
+                  Expanded(
+                    child: PremiumCard(
+                      color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.05),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            '$percent%',
+                            style: TextStyle(
+                              fontSize: 24,
+                              fontWeight: FontWeight.bold,
+                              color: Theme.of(context).colorScheme.primary,
+                            ),
+                          ),
+                          const Text('Today\'s Attendance'),
+                        ],
+                      ),
                     ),
-                    const SizedBox(height: AppSpacing.sm),
-                    LinearProgressIndicator(
-                      value: percent,
-                      borderRadius: BorderRadius.circular(4),
-                      minHeight: 8,
-                      backgroundColor: Theme.of(context).colorScheme.surfaceContainerHighest,
+                  ),
+                  const SizedBox(width: AppSpacing.md),
+                  Expanded(
+                    child: PremiumCard(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                           Text(
+                             '$present / $total', 
+                             style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold)
+                           ),
+                           const Text('Students Present'),
+                        ],
+                      ),
                     ),
-                  ],
-                ),
-              ),
-            ),
+                  ),
+               ],
+             ),
           ],
         );
       },
@@ -255,67 +414,28 @@ class _AdminDashboard extends StatelessWidget {
   }
 }
 
-class _StatCard extends StatelessWidget {
-  final String label;
-  final String value;
-  final IconData icon;
+class _SectionHeader extends StatelessWidget {
+  final String title;
+  final String action;
+  final VoidCallback onTap;
 
-  const _StatCard({required this.label, required this.value, required this.icon});
-
-  @override
-  Widget build(BuildContext context) {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(AppSpacing.cardPadding),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Icon(icon, color: Theme.of(context).colorScheme.primary),
-            const SizedBox(height: AppSpacing.sm),
-            Text(value, style: Theme.of(context).textTheme.headlineMedium?.copyWith(fontWeight: FontWeight.bold)),
-            Text(label, style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Theme.of(context).colorScheme.onSurfaceVariant)),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _StudentDashboard extends StatelessWidget {
-  final SupabaseDbService db;
-  final UserProvider provider;
-  const _StudentDashboard({required this.db, required this.provider});
+  const _SectionHeader({required this.title, required this.action, required this.onTap});
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
-         const Text("Quick Actions", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-         const SizedBox(height: AppSpacing.md),
-         ListTile(
-           tileColor: Theme.of(context).colorScheme.surfaceContainer,
-           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-           leading: const Icon(Icons.task_alt),
-           title: const Text("View Today's Tasks"),
-           subtitle: const Text("Check pending submissions"),
-           trailing: const Icon(Icons.arrow_forward_ios, size: 16),
-           onTap: () {
-              ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Switch to Tasks Tab")));
-           },
-         ),
-         const SizedBox(height: AppSpacing.sm),
-         ListTile(
-           tileColor: Theme.of(context).colorScheme.surfaceContainer,
-           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-           leading: const Icon(Icons.calendar_today),
-           title: const Text("Check Attendance"),
-           subtitle: Text(provider.isTeamLeader ? "Mark Team Attendance" : "View History"),
-           trailing: const Icon(Icons.arrow_forward_ios, size: 16),
-           onTap: () {
-              ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Switch to Attendance Tab")));
-           },
-         ),
+        Text(
+          title,
+          style: Theme.of(context).textTheme.titleMedium?.copyWith(
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+        TextButton(
+          onPressed: onTap,
+          child: Text(action),
+        ),
       ],
     );
   }

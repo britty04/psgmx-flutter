@@ -235,7 +235,7 @@ class UserProvider with ChangeNotifier {
       debugPrint('[UserProvider] Password created successfully');
 
       // Wait for auth state to be updated
-      await Future.delayed(Duration(milliseconds: 300));
+      await Future.delayed(const Duration(milliseconds: 300));
 
       debugPrint(
           '[UserProvider] Account setup complete - user is authenticated');

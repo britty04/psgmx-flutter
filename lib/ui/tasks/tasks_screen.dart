@@ -6,7 +6,9 @@ import 'package:excel/excel.dart' hide Border;
 import 'package:intl/intl.dart';
 import '../../providers/user_provider.dart';
 import '../../services/supabase_db_service.dart';
-import '../../core/theme/app_spacing.dart';
+import '../../core/theme/app_dimens.dart';
+import '../widgets/premium_card.dart';
+import '../widgets/premium_empty_state.dart';
 
 class TasksScreen extends StatelessWidget {
   const TasksScreen({super.key});
@@ -14,8 +16,10 @@ class TasksScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final userProvider = Provider.of<UserProvider>(context);
+    // Determine if user has publish rights
     final canPublish = userProvider.isCoordinator || (userProvider.isActualPlacementRep && !userProvider.isSimulating);
 
+    // Reps see the management interface, Students see the task list
     if (canPublish) {
         return const _RepTasksView();
     }
@@ -43,71 +47,91 @@ class _StudentTasksViewState extends State<_StudentTasksView> {
     final dateStr = DateFormat('yyyy-MM-dd').format(_selectedDate);
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text("Daily Tasks"),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.calendar_month_outlined),
-            onPressed: () => _pickDate(),
-            tooltip: "Select Date",
-          )
-        ],
-      ),
-      body: Column(
-        children: [
-          _DateSelectorHeader(
-            date: _selectedDate, 
-            onNext: () => setState(() => _selectedDate = _selectedDate.add(const Duration(days: 1))),
-            onPrev: () => setState(() => _selectedDate = _selectedDate.subtract(const Duration(days: 1))),
+      body: CustomScrollView(
+        slivers: [
+          SliverAppBar(
+            pinned: true,
+            floating: true,
+            title: const Text("Daily Roadmap"),
+            centerTitle: false,
+            actions: [
+              IconButton(
+                icon: const Icon(Icons.calendar_today_outlined),
+                onPressed: _pickDate,
+                tooltip: "Jump to Date",
+              )
+            ],
           ),
-          Expanded(
-            child: StreamBuilder<CompositeTask?>(
-               stream: dbService.getDailyTask(dateStr),
-               builder: (context, snapshot) {
-                 if (snapshot.connectionState == ConnectionState.waiting) {
-                   return const Center(child: CircularProgressIndicator());
-                 }
-                 final task = snapshot.data;
-                 
-                 // Empty State
-                 if (task == null) {
-                   return Center(
-                     child: Column(
-                       mainAxisAlignment: MainAxisAlignment.center,
-                       children: [
-                          Icon(Icons.assignment_turned_in_outlined, size: 64, color: Theme.of(context).colorScheme.outline.withValues(alpha: 0.5)),
-                          const SizedBox(height: AppSpacing.md),
-                          Text("No tasks for this day", style: Theme.of(context).textTheme.bodyLarge?.copyWith(color: Theme.of(context).colorScheme.outline)),
-                       ],
-                     ),
-                   );
-                 }
-                 
-                 // Tasks List
-                 return ListView(
-                   padding: const EdgeInsets.all(AppSpacing.screenPadding),
-                   children: [
+          
+          // Date Navigator Sticky Header
+          SliverToBoxAdapter(
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: AppSpacing.screenPadding, vertical: AppSpacing.md),
+              child: _DateNavigator(
+                date: _selectedDate,
+                onNext: () => setState(() => _selectedDate = _selectedDate.add(const Duration(days: 1))),
+                onPrev: () => setState(() => _selectedDate = _selectedDate.subtract(const Duration(days: 1))),
+              ),
+            ),
+          ),
+
+          // Content Stream
+          StreamBuilder<CompositeTask?>(
+             stream: dbService.getDailyTask(dateStr),
+             builder: (context, snapshot) {
+               // 1. Loading
+               if (snapshot.connectionState == ConnectionState.waiting) {
+                 return const SliverFillRemaining(
+                   child: Center(child: CircularProgressIndicator()),
+                 );
+               }
+               
+               final task = snapshot.data;
+               
+               // 2. Empty State
+               if (task == null) {
+                 return SliverFillRemaining(
+                   hasScrollBody: false,
+                   child: PremiumEmptyState(
+                     icon: Icons.coffee_outlined,
+                     message: "Rest Day",
+                     subMessage: "No tasks assigned for ${DateFormat('MMMM d').format(_selectedDate)}",
+                   ),
+                 );
+               }
+               
+               // 3. Tasks List
+               return SliverPadding(
+                 padding: const EdgeInsets.symmetric(horizontal: AppSpacing.screenPadding),
+                 sliver: SliverList(
+                   delegate: SliverChildListDelegate([
                       if (task.leetcodeUrl.isNotEmpty) 
-                        _TaskCard(
-                          type: "LeetCode",
+                        _TaskPremiumCard(
+                          type: "LeetCode Challenge",
+                          icon: Icons.code,
                           color: Colors.orange,
-                          title: "Daily Challenge",
+                          title: "Daily Coding Problem",
                           content: task.leetcodeUrl,
                           isLink: true 
                         ),
+                      
                       const SizedBox(height: AppSpacing.md),
+                      
                       if (task.csTopic.isNotEmpty)
-                        _TaskCard(
-                          type: "Core Topic",
+                        _TaskPremiumCard(
+                          type: "Core CS Concept",
+                          icon: Icons.menu_book_outlined,
                           color: Theme.of(context).colorScheme.primary,
                           title: task.csTopic,
                           content: task.csTopicDescription,
                           isLink: false
                         ),
-                   ],
-                 );
-               },
-            ),
+
+                      const SizedBox(height: AppSpacing.xxl),
+                   ]),
+                 ),
+               );
+             },
           ),
         ],
       ),
@@ -118,109 +142,170 @@ class _StudentTasksViewState extends State<_StudentTasksView> {
     final picked = await showDatePicker(
       context: context, 
       initialDate: _selectedDate, 
-      firstDate: DateTime(2024), 
-      lastDate: DateTime(2026),
-      builder: (context, child) {
-        return Theme(
-          data: Theme.of(context).copyWith(
-            dialogTheme: DialogThemeData(
-               backgroundColor: Theme.of(context).cardTheme.color,
-            ),
-          ), 
-          child: child!,
-        );
-      }
+      firstDate: DateTime(2025, 1, 1), 
+      lastDate: DateTime(2027),
     );
     if (picked != null) setState(() => _selectedDate = picked);
   }
 }
 
-class _DateSelectorHeader extends StatelessWidget {
+class _DateNavigator extends StatelessWidget {
   final DateTime date;
   final VoidCallback onPrev;
   final VoidCallback onNext;
 
-  const _DateSelectorHeader({required this.date, required this.onPrev, required this.onNext});
+  const _DateNavigator({required this.date, required this.onPrev, required this.onNext});
 
   @override
   Widget build(BuildContext context) {
-     return Container(
-       padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md, vertical: AppSpacing.sm),
-       decoration: BoxDecoration(
-         color: Theme.of(context).appBarTheme.backgroundColor,
-         border: Border(bottom: BorderSide(color: Theme.of(context).dividerColor)),
-       ),
+     return PremiumCard(
+       padding: const EdgeInsets.symmetric(horizontal: AppSpacing.sm, vertical: AppSpacing.xs),
        child: Row(
          mainAxisAlignment: MainAxisAlignment.spaceBetween,
          children: [
-           IconButton(onPressed: onPrev, icon: const Icon(Icons.chevron_left)),
-           Text(
-             DateFormat('EEEE, MMMM d').format(date), 
-             style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600)
+           IconButton(
+             onPressed: onPrev, 
+             icon: const Icon(Icons.chevron_left),
+             splashRadius: 24,
            ),
-           IconButton(onPressed: onNext, icon: const Icon(Icons.chevron_right)),
+           Column(
+             mainAxisSize: MainAxisSize.min,
+             children: [
+               Text(
+                 DateFormat('EEEE').format(date).toUpperCase(),
+                 style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                   color: Theme.of(context).colorScheme.onSurfaceVariant,
+                   letterSpacing: 1.0,
+                   fontWeight: FontWeight.bold
+                 ),
+               ),
+               Text(
+                 DateFormat('MMMM d, yyyy').format(date), 
+                 style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                   fontWeight: FontWeight.bold
+                 )
+               ),
+             ],
+           ),
+           IconButton(
+             onPressed: onNext, 
+             icon: const Icon(Icons.chevron_right),
+             splashRadius: 24,
+           ),
          ],
        ),
      );
   }
 }
 
-class _TaskCard extends StatelessWidget {
+class _TaskPremiumCard extends StatelessWidget {
   final String type;
+  final IconData icon;
   final Color color;
   final String title;
   final String content;
   final bool isLink;
 
-  const _TaskCard({required this.type, required this.color, required this.title, required this.content, required this.isLink});
+  const _TaskPremiumCard({
+    required this.type, 
+    required this.icon,
+    required this.color, 
+    required this.title, 
+    required this.content, 
+    required this.isLink
+  });
 
   @override
   Widget build(BuildContext context) {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(AppSpacing.cardPadding),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-             Container(
-               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-               decoration: BoxDecoration(
-                 color: color.withValues(alpha: 0.1),
-                 borderRadius: BorderRadius.circular(4),
-               ),
-               child: Text(
-                 type.toUpperCase(), 
-                 style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: color)
-               ),
+    return PremiumCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+           // Header Tag
+           Container(
+             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+             decoration: BoxDecoration(
+               color: color.withValues(alpha: 0.1),
+               borderRadius: BorderRadius.circular(AppRadius.sm),
+               border: Border.all(color: color.withValues(alpha: 0.2)),
              ),
-             const SizedBox(height: AppSpacing.sm),
-             Text(title, style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
-             Padding(
-               padding: const EdgeInsets.symmetric(vertical: AppSpacing.sm),
-               child: const Divider(height: 1),
+             child: Row(
+               mainAxisSize: MainAxisSize.min,
+               children: [
+                 Icon(icon, size: 14, color: color),
+                 const SizedBox(width: AppSpacing.xs),
+                 Text(
+                   type.toUpperCase(), 
+                   style: TextStyle(
+                     fontSize: 10, 
+                     fontWeight: FontWeight.bold, 
+                     color: color,
+                     letterSpacing: 0.5
+                   )
+                 ),
+               ],
              ),
-             if (isLink)
-                InkWell(
-                  onTap: () => launchUrl(Uri.parse(content)),
+           ),
+           
+           const SizedBox(height: AppSpacing.md),
+           
+           // Title
+           Text(
+             title, 
+             style: Theme.of(context).textTheme.titleLarge?.copyWith(
+               fontWeight: FontWeight.bold,
+               color: Theme.of(context).colorScheme.onSurface,
+             )
+           ),
+           
+           const Padding(
+             padding: EdgeInsets.symmetric(vertical: AppSpacing.md),
+             child: Divider(height: 1),
+           ),
+           
+           // Content Area
+           if (isLink)
+              InkWell(
+                onTap: () => launchUrl(Uri.parse(content)),
+                borderRadius: BorderRadius.circular(AppRadius.sm),
+                child: Container(
+                  padding: const EdgeInsets.all(AppSpacing.md),
+                  decoration: BoxDecoration(
+                    color: Theme.of(context).colorScheme.surfaceContainer,
+                    borderRadius: BorderRadius.circular(AppRadius.sm),
+                    border: Border.all(color: Theme.of(context).colorScheme.outline.withValues(alpha: 0.3)),
+                  ),
                   child: Row(
                     children: [
-                      Icon(Icons.link, size: 16, color: Theme.of(context).colorScheme.primary),
-                      const SizedBox(width: 8),
+                      Icon(Icons.link, color: Theme.of(context).colorScheme.primary),
+                      const SizedBox(width: AppSpacing.md),
                       Expanded(
                         child: Text(
                           content, 
-                          style: TextStyle(color: Theme.of(context).colorScheme.primary, decoration: TextDecoration.underline),
+                          style: TextStyle(
+                            color: Theme.of(context).colorScheme.primary, 
+                            fontWeight: FontWeight.w500,
+                            decoration: TextDecoration.underline,
+                            decorationColor: Theme.of(context).colorScheme.primary.withValues(alpha: 0.3),
+                          ),
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                         ),
                       ),
+                      const Icon(Icons.open_in_new, size: 16, color: Colors.grey),
                     ],
                   ),
+                ),
+              )
+           else
+              Text(
+                content, 
+                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                  height: 1.6,
+                  color: Theme.of(context).colorScheme.onSurfaceVariant
                 )
-             else
-                Text(content, style: Theme.of(context).textTheme.bodyMedium),
-          ],
-        ),
+              ),
+        ],
       ),
     );
   }
@@ -238,20 +323,26 @@ class _RepTasksView extends StatelessWidget {
     return DefaultTabController(
       length: 2, 
       child: Scaffold(
-        appBar: AppBar(
-          title: const Text("Manage Tasks"),
-          bottom: const TabBar(
-            tabs: [
-              Tab(text: "New Entry"),
-              Tab(text: "Bulk Upload"),
+        body: NestedScrollView(
+          headerSliverBuilder: (context, innerBoxIsScrolled) => [
+            const SliverAppBar(
+              title: Text("Manage Tasks"),
+              pinned: true,
+              floating: true,
+              bottom: TabBar(
+                tabs: [
+                  Tab(text: "New Entry"),
+                  Tab(text: "Bulk Upload"),
+                ],
+              ),
+            ),
+          ],
+          body: const TabBarView(
+            children: [
+               _SingleEntryForm(),
+               _BulkUploadForm(),
             ],
           ),
-        ),
-        body: const TabBarView(
-          children: [
-             _SingleEntryForm(),
-             _BulkUploadForm(),
-          ],
         ),
       )
     );
@@ -282,48 +373,88 @@ class _SingleEntryFormState extends State<_SingleEntryForm> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-             _FormSectionHeader(title: "Task Date"),
-             ListTile(
-               contentPadding: EdgeInsets.zero,
-               title: Text(DateFormat('yyyy-MM-dd').format(_date)),
-               subtitle: const Text("Tap to change"),
-               leading: const Icon(Icons.calendar_today),
-               trailing: const Icon(Icons.edit, size: 16),
-               onTap: () async {
-                 final d = await showDatePicker(context: context, initialDate: _date, firstDate: DateTime.now(), lastDate: DateTime(2026));
-                 if (d != null) setState(() => _date = d);
-               },
+             PremiumCard(
+               child: Column(
+                 crossAxisAlignment: CrossAxisAlignment.start,
+                 children: [
+                   const _FormSectionHeader(title: "Target Date"),
+                   InkWell(
+                     onTap: () async {
+                       final d = await showDatePicker(context: context, initialDate: _date, firstDate: DateTime.now(), lastDate: DateTime(2027));
+                       if (d != null) setState(() => _date = d);
+                     },
+                     borderRadius: BorderRadius.circular(AppRadius.md),
+                     child: Container(
+                       padding: const EdgeInsets.all(AppSpacing.md),
+                       decoration: BoxDecoration(
+                         border: Border.all(color: Theme.of(context).colorScheme.outline),
+                         borderRadius: BorderRadius.circular(AppRadius.md),
+                       ),
+                       child: Row(
+                         children: [
+                           const Icon(Icons.calendar_today, size: 20),
+                           const SizedBox(width: AppSpacing.md),
+                           Text(DateFormat('yyyy-MM-dd').format(_date), style: const TextStyle(fontWeight: FontWeight.bold)),
+                           const Spacer(),
+                           const Icon(Icons.edit, size: 16, color: Colors.grey),
+                         ],
+                       ),
+                     ),
+                   ),
+                 ],
+               ),
              ),
-             const SizedBox(height: AppSpacing.lg),
              
-             _FormSectionHeader(title: "Daily Challenge"),
-             TextFormField(
-               controller: _leetCtrl,
-               decoration: const InputDecoration(labelText: "LeetCode URL", hintText: "https://..."),
-               keyboardType: TextInputType.url,
+             const SizedBox(height: AppSpacing.md),
+             
+             PremiumCard(
+               child: Column(
+                 crossAxisAlignment: CrossAxisAlignment.start,
+                 children: [
+                   const _FormSectionHeader(title: "LeetCode Challenge"),
+                   TextFormField(
+                     controller: _leetCtrl,
+                     decoration: const InputDecoration(labelText: "Challenge URL", hintText: "https://leetcode.com/problems/..."),
+                     keyboardType: TextInputType.url,
+                   ),
+                 ],
+               ),
              ),
-             const SizedBox(height: AppSpacing.lg),
 
-             _FormSectionHeader(title: "Core Topic"),
-             TextFormField(
-               controller: _topicCtrl,
-               decoration: const InputDecoration(labelText: "Topic Title", hintText: "e.g., Virtual Memory"),
-             ),
-             const SizedBox(height: AppSpacing.sm),
-             TextFormField(
-               controller: _descCtrl,
-               decoration: const InputDecoration(labelText: "Instructions / Description", alignLabelWithHint: true),
-               maxLines: 4,
+             const SizedBox(height: AppSpacing.md),
+
+             PremiumCard(
+               child: Column(
+                 crossAxisAlignment: CrossAxisAlignment.start,
+                 children: [
+                   const _FormSectionHeader(title: "Core CS Topic"),
+                   TextFormField(
+                     controller: _topicCtrl,
+                     decoration: const InputDecoration(labelText: "Topic Title", hintText: "e.g. Operating Systems"),
+                   ),
+                   const SizedBox(height: AppSpacing.md),
+                   TextFormField(
+                     controller: _descCtrl,
+                     decoration: const InputDecoration(labelText: "Description / Instructions", alignLabelWithHint: true),
+                     maxLines: 4,
+                   ),
+                 ],
+               ),
              ),
              
              const SizedBox(height: AppSpacing.xl),
+             
              SizedBox(
                width: double.infinity,
-               child: FilledButton(
+               child: FilledButton.icon(
                  onPressed: _isLoading ? null : _submit,
-                 child: _isLoading 
-                    ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white)) 
-                    : const Text("Publish Task"),
+                 style: FilledButton.styleFrom(
+                   padding: const EdgeInsets.all(AppSpacing.lg),
+                 ),
+                 icon: _isLoading 
+                    ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                    : const Icon(Icons.send_rounded),
+                 label: const Text("PUBLISH TASK"),
                ),
              )
           ],
@@ -347,7 +478,7 @@ class _SingleEntryFormState extends State<_SingleEntryForm> {
       
       await Provider.of<SupabaseDbService>(context, listen: false).publishDailyTask(task);
       if (mounted) {
-         ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Published successfully")));
+         ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Task published successfully!")));
          _leetCtrl.clear();
          _topicCtrl.clear();
          _descCtrl.clear();
@@ -368,7 +499,14 @@ class _FormSectionHeader extends StatelessWidget {
   Widget build(BuildContext context) {
     return Padding(
       padding: const EdgeInsets.only(bottom: AppSpacing.sm),
-      child: Text(title, style: Theme.of(context).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold, color: Theme.of(context).colorScheme.primary)),
+      child: Text(
+        title.toUpperCase(), 
+        style: Theme.of(context).textTheme.labelSmall?.copyWith(
+          fontWeight: FontWeight.bold, 
+          color: Theme.of(context).colorScheme.primary,
+          letterSpacing: 1.0,
+        )
+      ),
     );
   }
 }
@@ -382,7 +520,7 @@ class _BulkUploadForm extends StatefulWidget {
 
 class _BulkUploadFormState extends State<_BulkUploadForm> {
   bool _isLoading = false;
-  String? _status;
+  String? _statusMessage;
   bool _isError = false;
 
   Future<void> _pickAndUpload() async {
@@ -395,13 +533,14 @@ class _BulkUploadFormState extends State<_BulkUploadForm> {
        );
        
        if (result == null) {
-          setState(() { _isLoading = false; _status = "File selection cancelled"; _isError = false; });
+          setState(() { _isLoading = false; _statusMessage = null; _isError = false; });
           return;
        }
 
        final bytes = result.files.first.bytes;
-       if (bytes == null) throw Exception("Could not read file.");
+       if (bytes == null) throw Exception("Could not read file data.");
 
+       // Parse Excel
        final excel = Excel.decodeBytes(bytes);
        final tasks = <CompositeTask>[];
 
@@ -409,17 +548,16 @@ class _BulkUploadFormState extends State<_BulkUploadForm> {
           final sheet = excel.tables[table];
           if (sheet == null) continue;
           
+          // Skip header row usually, start from 1
           for (int i = 1; i < sheet.maxRows; i++) {
              final row = sheet.row(i);
              if (row.isEmpty) continue;
              
              try {
-                if (row.isEmpty) continue;
                 final dateValRaw = row[0]?.value;
                 if (dateValRaw == null) continue;
                 
                 String dateStr;
-                
                 if (dateValRaw is DateCellValue) {
                    dateStr = DateFormat('yyyy-MM-dd').format(dateValRaw.asDateTimeLocal());
                 } else if (dateValRaw is TextCellValue) {
@@ -432,7 +570,7 @@ class _BulkUploadFormState extends State<_BulkUploadForm> {
                 if (row.length > 1) {
                    final val = row[1]?.value;
                    if (val is TextCellValue) {
-                      leet = val.value.toString(); // Wrapper handling
+                      leet = val.value.toString();
                    } else if (val != null) {
                       leet = val.toString();
                    }
@@ -448,12 +586,12 @@ class _BulkUploadFormState extends State<_BulkUploadForm> {
                   motivationQuote: ''
                 ));
              } catch (e) {
-                // Skip malformed rows silently or log
+                // Ignore malformed rows
              }
           }
        }
 
-       if (tasks.isEmpty) throw Exception("No valid rows found. Check format: Date | URL | Topic | Desc");
+       if (tasks.isEmpty) throw Exception("No valid rows found. Please check file format.");
        
        if (!mounted) return;
        final dbService = Provider.of<SupabaseDbService>(context, listen: false);
@@ -461,17 +599,17 @@ class _BulkUploadFormState extends State<_BulkUploadForm> {
        
        if (mounted) {
           setState(() { 
-            _status = "Successfully processed ${tasks.length} tasks."; 
+            _statusMessage = "Success! ${tasks.length} tasks scheduled."; 
             _isError = false; 
           });
        }
 
      } catch (e) {
-       if (context.mounted) {
-         setState(() { _status = "Upload Failed: $e"; _isError = true; });
+       if (mounted) {
+         setState(() { _statusMessage = "Upload Failed: $e"; _isError = true; });
        }
      } finally {
-       if (context.mounted) {
+       if (mounted) {
          setState(() => _isLoading = false);
        }
      }
@@ -479,52 +617,76 @@ class _BulkUploadFormState extends State<_BulkUploadForm> {
 
   @override
   Widget build(BuildContext context) {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(AppSpacing.xxl),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Container(
-              padding: const EdgeInsets.all(AppSpacing.xl),
-              decoration: BoxDecoration(
-                color: Theme.of(context).colorScheme.primaryContainer.withValues(alpha: 0.5),
-                shape: BoxShape.circle,
-              ),
-              child: Icon(Icons.upload_file_outlined, size: 48, color: Theme.of(context).colorScheme.primary),
-            ),
-            const SizedBox(height: AppSpacing.lg),
-            Text("Bulk Task Upload", style: Theme.of(context).textTheme.headlineSmall),
-            const SizedBox(height: AppSpacing.sm),
-            const Text("Supported formats: .xlsx", style: TextStyle(color: Colors.grey)),
-            const SizedBox(height: AppSpacing.xl),
-            
-            _isLoading 
-              ? const CircularProgressIndicator()
-              : FilledButton.icon(
-                  onPressed: _pickAndUpload, 
-                  icon: const Icon(Icons.folder_open), 
-                  label: const Text("Select Excel File")
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(AppSpacing.xxl),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          PremiumCard(
+            padding: const EdgeInsets.all(AppSpacing.xl),
+            child: Column(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(AppSpacing.xl),
+                  decoration: BoxDecoration(
+                    color: Theme.of(context).colorScheme.primaryContainer.withValues(alpha: 0.3),
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(Icons.upload_file, size: 48, color: Theme.of(context).colorScheme.primary),
                 ),
-
-            if (_status != null) ...[
-               const SizedBox(height: AppSpacing.lg),
-               Container(
+                const SizedBox(height: AppSpacing.lg),
+                Text("Bulk Task Upload", style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold)),
+                const SizedBox(height: AppSpacing.sm),
+                Text(
+                  "Upload an Excel (.xlsx) file with columns:\nDate | LeetCode URL | Topic | Description", 
+                  textAlign: TextAlign.center,
+                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: Theme.of(context).colorScheme.onSurfaceVariant),
+                ),
+                const SizedBox(height: AppSpacing.xl),
+                
+                if (_isLoading)
+                  const CircularProgressIndicator()
+                else
+                  FilledButton.icon(
+                    onPressed: _pickAndUpload, 
+                    icon: const Icon(Icons.folder_open), 
+                    label: const Text("Select Excel File"),
+                    style: FilledButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(horizontal: AppSpacing.xl, vertical: AppSpacing.md)
+                    ),
+                  ),
+              ],
+            ),
+          ),
+          
+          if (_statusMessage != null) ...[
+             const SizedBox(height: AppSpacing.lg),
+             AnimatedOpacity(
+               opacity: 1.0,
+               duration: AppDurations.slow,
+               child: Container(
                  padding: const EdgeInsets.all(AppSpacing.md),
                  decoration: BoxDecoration(
                    color: _isError ? Colors.red.shade50 : Colors.green.shade50,
-                   borderRadius: BorderRadius.circular(8),
+                   borderRadius: BorderRadius.circular(AppRadius.md),
                    border: Border.all(color: _isError ? Colors.red.shade200 : Colors.green.shade200),
                  ),
-                 child: Text(
-                   _status!, 
-                   style: TextStyle(color: _isError ? Colors.red.shade800 : Colors.green.shade800),
-                   textAlign: TextAlign.center,
+                 child: Row(
+                   children: [
+                     Icon(_isError ? Icons.error_outline : Icons.check_circle_outline, color: _isError ? Colors.red : Colors.green),
+                     const SizedBox(width: AppSpacing.md),
+                     Expanded(
+                       child: Text(
+                         _statusMessage!, 
+                         style: TextStyle(color: _isError ? Colors.red.shade900 : Colors.green.shade900, fontWeight: FontWeight.w500),
+                       ),
+                     ),
+                   ],
                  ),
-               )
-            ]
-          ],
-        ),
+               ),
+             )
+          ]
+        ],
       ),
     );
   }

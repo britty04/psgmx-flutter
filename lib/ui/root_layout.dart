@@ -38,30 +38,30 @@ class _RootLayoutState extends State<RootLayout> {
 
     // Dynamic Navigation Items
     final navItems = [
-      const NavigationDestination(
-        icon: Icon(Icons.home_outlined), 
-        selectedIcon: Icon(Icons.home), 
+      NavigationDestination(
+        icon: const Icon(Icons.home_outlined), 
+        selectedIcon: Icon(Icons.home, color: Theme.of(context).colorScheme.primary), 
         label: 'Home'
       ),
-      const NavigationDestination(
-        icon: Icon(Icons.task_alt_outlined), 
-        selectedIcon: Icon(Icons.task_alt), 
+      NavigationDestination(
+        icon: const Icon(Icons.check_circle_outline), 
+        selectedIcon: Icon(Icons.check_circle, color: Theme.of(context).colorScheme.primary), 
         label: 'Tasks'
       ),
-      const NavigationDestination(
-        icon: Icon(Icons.calendar_month_outlined), 
-        selectedIcon: Icon(Icons.calendar_month), 
+      NavigationDestination(
+        icon: const Icon(Icons.calendar_today_outlined), 
+        selectedIcon: Icon(Icons.calendar_today, color: Theme.of(context).colorScheme.primary), 
         label: 'Attendance'
       ),
       if (userProvider.isCoordinator || userProvider.isPlacementRep || userProvider.hasActualAdminAccess)
-        const NavigationDestination(
-          icon: Icon(Icons.analytics_outlined), 
-          selectedIcon: Icon(Icons.analytics), 
+        NavigationDestination(
+          icon: const Icon(Icons.bar_chart_outlined), 
+          selectedIcon: Icon(Icons.bar_chart, color: Theme.of(context).colorScheme.primary), 
           label: 'Reports'
         ),
-      const NavigationDestination(
-        icon: Icon(Icons.person_outline), 
-        selectedIcon: Icon(Icons.person), 
+      NavigationDestination(
+        icon: const Icon(Icons.person_outline), 
+        selectedIcon: Icon(Icons.person, color: Theme.of(context).colorScheme.primary), 
         label: 'Profile'
       ),
     ];

@@ -5,14 +5,20 @@ import 'package:go_router/go_router.dart';
 import 'core/supabase_config.dart';
 import 'core/app_router.dart';
 import 'providers/user_provider.dart';
+import 'providers/leetcode_provider.dart';
+import 'providers/announcement_provider.dart';
+import 'providers/attendance_provider.dart';
 import 'services/auth_service.dart';
 import 'services/supabase_service.dart';
 import 'services/supabase_db_service.dart';
 import 'services/quote_service.dart';
+import 'services/notification_service.dart';
 import 'core/theme/app_theme.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  
+  await NotificationService().init();
   
   await Supabase.initialize(
     url: SupabaseConfig.supabaseUrl,
@@ -41,6 +47,15 @@ class PsgMxApp extends StatelessWidget {
         Provider<QuoteService>.value(value: quoteService),
         ChangeNotifierProvider(
           create: (_) => UserProvider(authService: authService),
+        ),
+        ChangeNotifierProvider(
+          create: (_) => LeetCodeProvider(supabaseService),
+        ),
+        ChangeNotifierProvider(
+          create: (_) => AnnouncementProvider(supabaseService),
+        ),
+        ChangeNotifierProvider(
+          create: (_) => AttendanceProvider(supabaseService),
         ),
       ],
       child: const PsgMxAppInner(),

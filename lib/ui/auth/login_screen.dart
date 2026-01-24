@@ -2,17 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:go_router/go_router.dart';
 import '../../providers/user_provider.dart';
+import '../../core/theme/app_dimens.dart';
+import '../widgets/premium_card.dart';
 
 /// LoginScreen: Sign in with email and password
-/// 
-/// User flow:
-/// 1. Enters college email
-/// 2. Enters password
-/// 3. System authenticates via Supabase Auth
-/// 4. On success:
-///    - User profile is loaded
-///    - Roles are fetched from database
-///    - Navigate to Dashboard
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
 
@@ -120,210 +113,183 @@ class _LoginScreenState extends State<LoginScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final isMobile = MediaQuery.of(context).size.width < 600;
-    final colorScheme = Theme.of(context).colorScheme;
-    final textTheme = Theme.of(context).textTheme;
-
+    // Determine layout mode
+    
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Sign In'),
-        centerTitle: true,
-      ),
-      body: SafeArea(
+      backgroundColor: Theme.of(context).colorScheme.surfaceContainerLow, // Distinct background
+      body: Center(
         child: SingleChildScrollView(
-          child: Padding(
-            padding: EdgeInsets.symmetric(
-              horizontal: isMobile ? 24 : 40,
-              vertical: isMobile ? 32 : 40,
-            ),
-            child: Center(
-              child: ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 480),
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    /// Header Section
-                    Center(
-                      child: Container(
-                        width: 80,
-                        height: 80,
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          color: colorScheme.primaryContainer,
-                        ),
-                        child: Icon(
-                          Icons.lock_outline_rounded,
-                          size: 40,
-                          color: colorScheme.primary,
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 24),
-                    Text(
-                      'Welcome Back',
-                      textAlign: TextAlign.center,
-                      style: textTheme.headlineSmall?.copyWith(
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    Text(
-                      'Sign in to your PSG MCA Prep account',
-                      textAlign: TextAlign.center,
-                      style: textTheme.bodyMedium?.copyWith(
-                        color: colorScheme.outline,
-                      ),
-                    ),
-                    const SizedBox(height: 32),
-
-                    /// Email Field
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'College Email',
-                          style: textTheme.bodySmall?.copyWith(
-                            fontWeight: FontWeight.w500,
-                          ),
-                        ),
-                        const SizedBox(height: 8),
-                        TextField(
+          padding: const EdgeInsets.all(AppSpacing.screenPadding),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+               // Brand / Logo Section
+               Column(
+                 children: [
+                   Container(
+                     height: 60, width: 60,
+                     decoration: BoxDecoration(
+                       gradient: LinearGradient(
+                         colors: [Theme.of(context).colorScheme.primary, Theme.of(context).colorScheme.secondary],
+                         begin: Alignment.topLeft,
+                         end: Alignment.bottomRight,
+                       ),
+                       borderRadius: BorderRadius.circular(16),
+                       boxShadow: [
+                         BoxShadow(
+                           color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.3),
+                           blurRadius: 15,
+                           offset: const Offset(0, 8)
+                         )
+                       ]
+                     ),
+                     child: const Icon(Icons.school, color: Colors.white, size: 32),
+                   ),
+                   const SizedBox(height: AppSpacing.lg),
+                   Text(
+                     "PSG MCA Prep",
+                     style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                       fontWeight: FontWeight.bold,
+                       color: Theme.of(context).colorScheme.onSurface,
+                     ),
+                   ),
+                   const SizedBox(height: AppSpacing.xs),
+                   Text(
+                     "Sign in to continue your progress",
+                     style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                       color: Theme.of(context).colorScheme.onSurfaceVariant
+                     ),
+                   )
+                 ],
+               ),
+               
+               const SizedBox(height: AppSpacing.xxl),
+               
+               // The Login Card
+               ConstrainedBox(
+                 constraints: const BoxConstraints(maxWidth: 400),
+                 child: PremiumCard(
+                   color: Theme.of(context).colorScheme.surface,
+                   padding: const EdgeInsets.all(AppSpacing.xl),
+                   child: Column(
+                     crossAxisAlignment: CrossAxisAlignment.stretch,
+                     children: [
+                       
+                       // Email Input
+                       Text(
+                         "College Email", 
+                         style: Theme.of(context).textTheme.labelMedium?.copyWith(fontWeight: FontWeight.bold)
+                       ),
+                       const SizedBox(height: AppSpacing.sm),
+                       TextField(
                           controller: _emailController,
                           enabled: !_isLoading,
                           keyboardType: TextInputType.emailAddress,
                           decoration: InputDecoration(
-                            hintText: 'your.name@psgtech.ac.in',
-                            prefixIcon: Icon(Icons.email_outlined,
-                                color: colorScheme.outline),
+                            hintText: 'john.doe@psgtech.ac.in',
+                            prefixIcon: Icon(Icons.email_outlined, color: Theme.of(context).colorScheme.outline),
                             errorText: _emailError,
-                            border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(12),
-                            ),
                           ),
                           onChanged: (_) {
                             if (_emailError != null) _validateEmail();
                           },
                         ),
-                      ],
-                    ),
-                    const SizedBox(height: 24),
+                        
+                        const SizedBox(height: AppSpacing.lg),
 
-                    /// Password Field
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
+                       // Password Input
+                       Row(
+                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                         children: [
                             Text(
-                              'Password',
-                              style: textTheme.bodySmall?.copyWith(
-                                fontWeight: FontWeight.w500,
-                              ),
+                              "Password", 
+                              style: Theme.of(context).textTheme.labelMedium?.copyWith(fontWeight: FontWeight.bold)
                             ),
-                            TextButton(
-                              onPressed: _isLoading
-                                  ? null
-                                  : () => context.go('/forgot_password'),
-                              child: const Text('Forgot?'),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 8),
-                        TextField(
+                            GestureDetector(
+                               onTap: _isLoading ? null : () => context.push('/forgot_password'),
+                               child: Text(
+                                 "Forgot?",
+                                 style: TextStyle(
+                                   color: Theme.of(context).colorScheme.primary,
+                                   fontWeight: FontWeight.w600,
+                                   fontSize: 12,
+                                 ),
+                               ),
+                            )
+                         ],
+                       ),
+                       const SizedBox(height: AppSpacing.sm),
+                       TextField(
                           controller: _passwordController,
                           enabled: !_isLoading,
                           obscureText: !_showPassword,
                           decoration: InputDecoration(
-                            hintText: 'Enter your password',
-                            prefixIcon: Icon(Icons.lock_outline_rounded,
-                                color: colorScheme.outline),
+                            hintText: '••••••••',
+                            prefixIcon: Icon(Icons.lock_outline, color: Theme.of(context).colorScheme.outline),
                             suffixIcon: IconButton(
                               icon: Icon(
-                                _showPassword
-                                    ? Icons.visibility_rounded
-                                    : Icons.visibility_off_rounded,
-                                color: colorScheme.outline,
+                                _showPassword ? Icons.visibility : Icons.visibility_off,
+                                color: Theme.of(context).colorScheme.outline,
                               ),
-                              onPressed: () {
-                                setState(
-                                    () => _showPassword = !_showPassword);
-                              },
+                              onPressed: () => setState(() => _showPassword = !_showPassword),
                             ),
                             errorText: _passwordError,
-                            border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(12),
-                            ),
                           ),
                           onChanged: (_) {
                             if (_passwordError != null) _validatePassword();
                           },
                         ),
-                      ],
-                    ),
-                    const SizedBox(height: 24),
+                        
+                        const SizedBox(height: AppSpacing.xl),
 
-                    /// General Error Message
-                    if (_generalError != null)
-                      Padding(
-                        padding: const EdgeInsets.only(bottom: 16),
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 16,
-                            vertical: 12,
-                          ),
-                          decoration: BoxDecoration(
-                            color: colorScheme.errorContainer,
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          child: Text(
-                            _generalError!,
-                            style: textTheme.bodySmall?.copyWith(
-                              color: colorScheme.error,
+                        /// General Error Message
+                        if (_generalError != null)
+                          Container(
+                            margin: const EdgeInsets.only(bottom: AppSpacing.lg),
+                            padding: const EdgeInsets.all(AppSpacing.md),
+                            decoration: BoxDecoration(
+                              color: Theme.of(context).colorScheme.errorContainer.withValues(alpha: 0.5),
+                              borderRadius: BorderRadius.circular(AppRadius.md),
+                              border: Border.all(color: Theme.of(context).colorScheme.errorContainer),
+                            ),
+                            child: Row(
+                              children: [
+                                Icon(Icons.error_outline, color: Theme.of(context).colorScheme.error, size: 20),
+                                const SizedBox(width: AppSpacing.sm),
+                                Expanded(
+                                  child: Text(
+                                    _generalError!,
+                                    style: TextStyle(color: Theme.of(context).colorScheme.error, fontSize: 13),
+                                  ),
+                                ),
+                              ],
                             ),
                           ),
+                        
+                        // Submit Button
+                        FilledButton(
+                          onPressed: _isLoading ? null : _handleSignIn,
+                          style: FilledButton.styleFrom(
+                            padding: const EdgeInsets.all(AppSpacing.md),
+                          ),
+                          child: _isLoading 
+                             ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                             : const Text("Sign In"),
                         ),
-                      ),
 
-                    /// Sign In Button
-                    FilledButton(
-                      onPressed: _isLoading ? null : _handleSignIn,
-                      child: _isLoading
-                          ? SizedBox(
-                              height: 20,
-                              width: 20,
-                              child: CircularProgressIndicator(
-                                strokeWidth: 2,
-                                valueColor: AlwaysStoppedAnimation<Color>(
-                                  colorScheme.onPrimary,
-                                ),
-                              ),
-                            )
-                          : const Text('Sign In'),
-                    ),
-                    const SizedBox(height: 16),
-
-                    /// Sign Up Link
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Text(
-                          'New user? ',
-                          style: textTheme.bodySmall,
-                        ),
-                        TextButton(
-                          onPressed: _isLoading
-                              ? null
-                              : () => context.go('/set_password'),
-                          child: const Text('Create Account'),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-            ),
+                     ],
+                   ),
+                 ),
+               ),
+               
+               const SizedBox(height: AppSpacing.xxl),
+               
+               // Footer
+               Text(
+                 "© 2026 PSG College of Technology",
+                 style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Theme.of(context).colorScheme.outline),
+               )
+            ],
           ),
         ),
       ),

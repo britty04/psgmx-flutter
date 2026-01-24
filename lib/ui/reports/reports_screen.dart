@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../services/supabase_db_service.dart';
-import '../../core/theme/app_spacing.dart';
+import '../../core/theme/app_dimens.dart';
+import '../widgets/premium_card.dart';
+import '../widgets/premium_empty_state.dart';
 
 class ReportsScreen extends StatelessWidget {
   const ReportsScreen({super.key});
@@ -11,88 +13,167 @@ class ReportsScreen extends StatelessWidget {
     final db = Provider.of<SupabaseDbService>(context, listen: false);
 
     return Scaffold(
-      appBar: AppBar(title: const Text("Reports & Analytics")),
-      body: FutureBuilder<Map<String, dynamic>>(
-        future: db.getPlacementStats(),
-        builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting) return const Center(child: CircularProgressIndicator());
-          if (snapshot.hasError) return Center(child: Text("Error: ${snapshot.error}"));
+      body: CustomScrollView(
+        slivers: [
+          const SliverAppBar(
+            title: Text("Analytics & Reports"),
+            pinned: true,
+            floating: true,
+          ),
           
-          final data = snapshot.data!;
-          final total = data['total_students'] as int;
-          final present = data['today_present'] as int;
-          final percent = total > 0 ? (present / total) : 0.0;
-          
-          return ListView(
-            padding: const EdgeInsets.all(AppSpacing.screenPadding),
-            children: [
-               _SummaryCard(total: total, present: present, percent: percent),
-               const SizedBox(height: AppSpacing.lg),
-               Text("Data Export", style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
-               const SizedBox(height: AppSpacing.md),
-               Card(
-                 elevation: 0,
-                 color: Theme.of(context).cardTheme.color,
-                 child: Column(
-                   children: [
-                     _ActionListTile(
-                       icon: Icons.table_chart_outlined,
-                       title: "Attendance Report",
-                       subtitle: "Download as .xlsx",
-                       onTap: () {
-                          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Cloud Function required")));
-                       },
-                     ),
-                     Divider(height: 1, indent: 56, color: Theme.of(context).dividerColor),
-                     _ActionListTile(
-                       icon: Icons.task_outlined,
-                       title: "Task Submissions",
-                       subtitle: "Download as .csv",
-                       onTap: () {
-                          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Not implemented")));
-                       },
-                     ),
-                   ],
-                 ),
-               )
-            ],
-          );
-        }
+          SliverPadding(
+             padding: const EdgeInsets.all(AppSpacing.screenPadding),
+             sliver: SliverToBoxAdapter(
+               child: FutureBuilder<Map<String, dynamic>>(
+                  future: db.getPlacementStats(),
+                  builder: (context, snapshot) {
+                    if (snapshot.connectionState == ConnectionState.waiting) {
+                       return const Center(child: Padding(
+                         padding: EdgeInsets.all(AppSpacing.xl),
+                         child: CircularProgressIndicator(),
+                       ));
+                    }
+                    if (snapshot.hasError) {
+                       return PremiumEmptyState(
+                         icon: Icons.error_outline, 
+                         message: "Data Error",
+                         subMessage: snapshot.error.toString()
+                       );
+                    }
+                    
+                    final data = snapshot.data!;
+                    final total = data['total_students'] as int;
+                    final present = data['today_present'] as int;
+                    final percent = total > 0 ? (present / total) : 0.0;
+                    
+                    return Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                         // Summary Section
+                         _SummaryPremiumCard(total: total, present: present, percent: percent),
+                         
+                         const SizedBox(height: AppSpacing.xxl),
+                         
+                         // Actions Section
+                         Text(
+                           "DATA EXPORT", 
+                           style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                             fontWeight: FontWeight.bold,
+                             color: Theme.of(context).colorScheme.primary,
+                             letterSpacing: 1.2
+                           )
+                         ),
+                         const SizedBox(height: AppSpacing.md),
+                         
+                         PremiumCard(
+                           padding: EdgeInsets.zero,
+                           child: Column(
+                             children: [
+                               _ActionListTile(
+                                 icon: Icons.table_chart_outlined,
+                                 title: "Attendance Report",
+                                 subtitle: "Download daily logs as .xlsx",
+                                 onTap: () {
+                                    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Cloud Function required")));
+                                 },
+                               ),
+                               Divider(height: 1, indent: 56, color: Theme.of(context).dividerColor.withValues(alpha: 0.5)),
+                               _ActionListTile(
+                                 icon: Icons.task_outlined,
+                                 title: "Task Submissions",
+                                 subtitle: "Download compilation as .csv",
+                                 onTap: () {
+                                    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Not implemented")));
+                                 },
+                               ),
+                               Divider(height: 1, indent: 56, color: Theme.of(context).dividerColor.withValues(alpha: 0.5)),
+                               _ActionListTile(
+                                 icon: Icons.pie_chart_outline,
+                                 title: "Placement Statistics",
+                                 subtitle: "Summary PDF Report",
+                                 onTap: () {
+                                     ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Not implemented")));
+                                 },
+                               ),
+                             ],
+                           ),
+                         )
+                      ],
+                    );
+                  }
+                ),
+             ),
+          )
+        ],
       ),
     );
   }
 }
 
-class _SummaryCard extends StatelessWidget {
+class _SummaryPremiumCard extends StatelessWidget {
   final int total;
   final int present;
   final double percent;
 
-  const _SummaryCard({required this.total, required this.present, required this.percent});
+  const _SummaryPremiumCard({required this.total, required this.present, required this.percent});
 
   @override
   Widget build(BuildContext context) {
-     return Card(
-       color: Theme.of(context).colorScheme.primary,
-       child: Padding(
-         padding: const EdgeInsets.all(AppSpacing.lg),
-         child: Column(
-           crossAxisAlignment: CrossAxisAlignment.start,
-           children: [
-              Text("Today's Overview", style: TextStyle(color: Theme.of(context).colorScheme.onPrimary.withValues(alpha: 0.8), fontWeight: FontWeight.bold)),
-              const SizedBox(height: AppSpacing.lg),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                   _Metric(label: "Total Students", value: total.toString()),
-                   Container(height: 40, width: 1, color: Theme.of(context).colorScheme.onPrimary.withValues(alpha: 0.2)),
-                   _Metric(label: "Present", value: present.toString()),
-                   Container(height: 40, width: 1, color: Theme.of(context).colorScheme.onPrimary.withValues(alpha: 0.2)),
-                   _Metric(label: "Rate", value: "${(percent * 100).toStringAsFixed(1)}%"),
-                ],
-              )
-           ],
-         ),
+     return PremiumCard(
+       color: Theme.of(context).colorScheme.primary, // Dark blue background
+       padding: const EdgeInsets.all(AppSpacing.lg),
+       child: Column(
+         crossAxisAlignment: CrossAxisAlignment.start,
+         children: [
+            Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(AppSpacing.xs),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withValues(alpha: 0.2),
+                    borderRadius: BorderRadius.circular(AppRadius.sm)
+                  ),
+                  child: const Icon(Icons.bar_chart, color: Colors.white, size: 16),
+                ),
+                const SizedBox(width: AppSpacing.sm),
+                Text(
+                  "Today's Overview", 
+                  style: TextStyle(
+                    color: Colors.white.withValues(alpha: 0.9), 
+                    fontWeight: FontWeight.bold,
+                    fontSize: 12,
+                    letterSpacing: 0.5
+                  )
+                ),
+              ],
+            ),
+            const SizedBox(height: AppSpacing.xl),
+            
+            // Metrics Row
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                 Expanded(child: _Metric(label: "Total Students", value: total.toString())),
+                 Container(height: 40, width: 1, color: Colors.white.withValues(alpha: 0.2)),
+                 Expanded(child: _Metric(label: "Present", value: present.toString())),
+                 Container(height: 40, width: 1, color: Colors.white.withValues(alpha: 0.2)),
+                 Expanded(child: _Metric(label: "Attendance", value: "${(percent * 100).toStringAsFixed(0)}%")),
+              ],
+            ),
+            
+            const SizedBox(height: AppSpacing.lg),
+            
+            // Progress Bar
+            ClipRRect(
+              borderRadius: BorderRadius.circular(AppRadius.pill),
+              child: LinearProgressIndicator(
+                value: percent,
+                minHeight: 6,
+                backgroundColor: Colors.white.withValues(alpha: 0.2),
+                color: Colors.white,
+              ),
+            )
+         ],
        ),
      );
   }
@@ -107,9 +188,23 @@ class _Metric extends StatelessWidget {
   Widget build(BuildContext context) {
      return Column(
        children: [
-          Text(value, style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Theme.of(context).colorScheme.onPrimary)),
+          Text(
+            value, 
+            style: const TextStyle(
+              fontSize: 22, 
+              fontWeight: FontWeight.bold, 
+              color: Colors.white
+            )
+          ),
           const SizedBox(height: 4),
-          Text(label, style: TextStyle(fontSize: 10, color: Theme.of(context).colorScheme.onPrimary.withValues(alpha: 0.7))),
+          Text(
+            label, 
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              fontSize: 10, 
+              color: Colors.white.withValues(alpha: 0.7)
+            )
+          ),
        ],
      );
   }
@@ -127,15 +222,15 @@ class _ActionListTile extends StatelessWidget {
   Widget build(BuildContext context) {
     return ListTile(
       leading: Container(
-        padding: const EdgeInsets.all(8),
+        padding: const EdgeInsets.all(AppSpacing.sm),
         decoration: BoxDecoration(
           color: Theme.of(context).colorScheme.surfaceContainer,
-          borderRadius: BorderRadius.circular(8),
+          borderRadius: BorderRadius.circular(AppRadius.md),
         ),
-        child: Icon(icon, color: Theme.of(context).colorScheme.primary),
+        child: Icon(icon, color: Theme.of(context).colorScheme.primary, size: 20),
       ),
-      title: Text(title, style: const TextStyle(fontWeight: FontWeight.w600)),
-      subtitle: Text(subtitle),
+      title: Text(title, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
+      subtitle: Text(subtitle, style: const TextStyle(fontSize: 12)),
       trailing: Icon(Icons.download, size: 20, color: Theme.of(context).colorScheme.outline),
       onTap: onTap,
     );

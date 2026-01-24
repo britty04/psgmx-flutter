@@ -2,7 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../providers/user_provider.dart';
 import '../../models/app_user.dart';
-import '../../core/theme/app_spacing.dart';
+import '../../core/theme/app_dimens.dart';
+import '../widgets/premium_card.dart';
 
 class ProfileScreen extends StatelessWidget {
   const ProfileScreen({super.key});
@@ -16,92 +17,229 @@ class ProfileScreen extends StatelessWidget {
       return const Scaffold(body: Center(child: CircularProgressIndicator()));
     }
 
+    final isSimulating = provider.isSimulating;
+
     return Scaffold(
-      appBar: AppBar(title: const Text("Profile")),
-      body: ListView(
-        padding: const EdgeInsets.all(AppSpacing.screenPadding),
-        children: [
-          Center(
-            child: Column(
-              children: [
-                CircleAvatar(
-                  radius: 48, 
-                  backgroundColor: Theme.of(context).colorScheme.primaryContainer,
-                  child: Text(
-                    user.name.isNotEmpty ? user.name[0] : '?', 
-                    style: TextStyle(fontSize: 32, color: Theme.of(context).colorScheme.onPrimaryContainer, fontWeight: FontWeight.bold)
+      body: CustomScrollView(
+        slivers: [
+          SliverAppBar(
+            pinned: true,
+            title: const Text("My Profile"),
+            centerTitle: true,
+            actions: [
+               IconButton(
+                 icon: const Icon(Icons.settings_outlined),
+                 onPressed: () {
+                   ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Settings not implemented yet")));
+                 },
+               )
+            ],
+          ),
+          
+          SliverToBoxAdapter(
+             child: Column(
+               children: [
+                 const SizedBox(height: AppSpacing.lg),
+                 // Profile Header
+                 Stack(
+                   alignment: Alignment.center,
+                   children: [
+                     Container(
+                       height: 120, width: 120,
+                       decoration: BoxDecoration(
+                         shape: BoxShape.circle,
+                         gradient: LinearGradient(
+                           colors: [
+                              Theme.of(context).colorScheme.primary,
+                              Theme.of(context).colorScheme.secondary,
+                           ],
+                           begin: Alignment.topLeft,
+                           end: Alignment.bottomRight,
+                         ),
+                         boxShadow: [
+                           BoxShadow(
+                             color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.3),
+                             blurRadius: 15,
+                             offset: const Offset(0, 8)
+                           )
+                         ]
+                       ),
+                       child: Center(
+                         child: Text(
+                            user.name.isNotEmpty ? user.name[0] : '?',
+                            style: const TextStyle(fontSize: 48, fontWeight: FontWeight.bold, color: Colors.white),
+                         ),
+                       ),
+                     ),
+                     Positioned(
+                       bottom: 0,
+                       right: 0,
+                       child: Container(
+                         padding: const EdgeInsets.all(6),
+                         decoration: BoxDecoration(
+                           color: Theme.of(context).scaffoldBackgroundColor,
+                           shape: BoxShape.circle,
+                         ),
+                         child: Container(
+                           padding: const EdgeInsets.all(6),
+                           decoration: BoxDecoration(
+                             color: Theme.of(context).colorScheme.primary,
+                             shape: BoxShape.circle,
+                           ),
+                           child: const Icon(Icons.edit, size: 14, color: Colors.white),
+                         ),
+                       ),
+                     )
+                   ],
+                 ),
+                 
+                 const SizedBox(height: AppSpacing.md),
+                 Text(user.name, style: Theme.of(context).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold)),
+                 const SizedBox(height: 4),
+                 Text(user.email, style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: Theme.of(context).colorScheme.onSurfaceVariant)),
+                 
+                 const SizedBox(height: AppSpacing.md),
+                 _buildRoleChip(context, provider),
+                 
+                 const SizedBox(height: AppSpacing.xxl),
+               ],
+             ),
+          ),
+          
+          SliverPadding(
+            padding: const EdgeInsets.symmetric(horizontal: AppSpacing.screenPadding),
+            sliver: SliverList(
+              delegate: SliverChildListDelegate([
+                
+                // Simulation Control (Admin/Rep Only)
+                if (provider.isActualPlacementRep) ...[
+                   const _SectionLabel(label: "DEV TOOLS"),
+                   PremiumCard(
+                     backgroundColor: isSimulating ? Theme.of(context).colorScheme.errorContainer.withValues(alpha: 0.3) : null,
+                     padding: EdgeInsets.zero,
+                     child: Column(
+                       children: [
+                          if (isSimulating)
+                            Container(
+                              width: double.infinity,
+                              padding: const EdgeInsets.all(AppSpacing.sm),
+                              color: Theme.of(context).colorScheme.error,
+                              child: const Text(
+                                "SIMULATION ACTIVE", 
+                                textAlign: TextAlign.center,
+                                style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 10, letterSpacing: 1.2)
+                              ),
+                            ),
+                          
+                          SwitchListTile(
+                            title: const Text("Simulate Student"),
+                            subtitle: const Text("View app as access level: Student"),
+                            secondary: Icon(Icons.person_outline, color: isSimulating ? Theme.of(context).colorScheme.error : null),
+                            value: provider.simulatedRole == UserRole.student,
+                            activeTrackColor: Theme.of(context).colorScheme.error,
+                            onChanged: (v) => provider.setSimulationRole(v ? UserRole.student : null),
+                          ),
+                          Divider(height: 1, indent: 56, color: Theme.of(context).dividerColor.withValues(alpha: 0.5)),
+                          SwitchListTile(
+                            title: const Text("Simulate Team Leader"),
+                            subtitle: const Text("View app as access level: Leader"),
+                            secondary: Icon(Icons.badge_outlined, color: isSimulating ? Theme.of(context).colorScheme.error : null),
+                            value: provider.simulatedRole == UserRole.teamLeader,
+                            activeTrackColor: Theme.of(context).colorScheme.error,
+                            onChanged: (v) => provider.setSimulationRole(v ? UserRole.teamLeader : null),
+                          ),
+                       ],
+                     ),
+                   ),
+                   const SizedBox(height: AppSpacing.xl),
+                ],
+
+                // Account
+                const _SectionLabel(label: "ACCOUNT PREFERENCES"),
+                PremiumCard(
+                  padding: EdgeInsets.zero,
+                  child: Column(
+                    children: [
+                      ListTile(
+                        leading: const Icon(Icons.notifications_outlined),
+                        title: const Text("Notifications"),
+                        trailing: Switch(value: true, onChanged: (v) {}), // Placeholder
+                      ),
+                      Divider(height: 1, indent: 56, color: Theme.of(context).dividerColor.withValues(alpha: 0.5)),
+                      ListTile(
+                        leading: const Icon(Icons.lock_outline),
+                        title: const Text("Change Password"),
+                        trailing: const Icon(Icons.chevron_right, size: 18),
+                        onTap: () {},
+                      ),
+                      Divider(height: 1, indent: 56, color: Theme.of(context).dividerColor.withValues(alpha: 0.5)),
+                      ListTile(
+                        leading: const Icon(Icons.help_outline),
+                        title: const Text("Help & Support"),
+                        trailing: const Icon(Icons.chevron_right, size: 18),
+                        onTap: () {},
+                      ),
+                    ],
                   ),
                 ),
-                const SizedBox(height: AppSpacing.md),
-                Text(user.name, style: Theme.of(context).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold)),
-                Text(user.email, style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: Theme.of(context).colorScheme.outline)),
-                const SizedBox(height: AppSpacing.sm),
-                Chip(
-                  label: Text(provider.isActualPlacementRep ? "Placement Rep" : "Student"),
-                  backgroundColor: Theme.of(context).colorScheme.surfaceContainerHighest,
-                  side: BorderSide.none,
-                )
-              ],
-            ),
-          ),
-          const SizedBox(height: AppSpacing.xl),
-          
-          if (provider.isActualPlacementRep) ...[
-             Text("Simulation Mode", style: Theme.of(context).textTheme.labelLarge?.copyWith(color: Theme.of(context).colorScheme.primary, fontWeight: FontWeight.bold)),
-             const SizedBox(height: AppSpacing.sm),
-             Card(
-               child: Column(
-                 children: [
-                   SwitchListTile(
-                     title: const Text("Simulate Student"),
-                     subtitle: const Text("View app as access level: Student"),
-                     secondary: const Icon(Icons.person_outline),
-                     value: provider.simulatedRole == UserRole.student,
-                     onChanged: (v) => provider.setSimulationRole(v ? UserRole.student : null),
-                   ),
-                   const Divider(height: 1),
-                   SwitchListTile(
-                     title: const Text("Simulate Team Leader"),
-                     subtitle: const Text("View app as access level: Leader"),
-                     secondary: const Icon(Icons.badge_outlined),
-                     value: provider.simulatedRole == UserRole.teamLeader,
-                     onChanged: (v) => provider.setSimulationRole(v ? UserRole.teamLeader : null),
-                   ),
-                 ],
-               ),
-             ),
-             const SizedBox(height: AppSpacing.lg),
-          ],
-
-          Text("Account", style: Theme.of(context).textTheme.labelLarge?.copyWith(color: Theme.of(context).colorScheme.primary, fontWeight: FontWeight.bold)),
-          const SizedBox(height: AppSpacing.sm),
-          Card(
-            child: Column(
-              children: [
-                ListTile(
-                   leading: const Icon(Icons.settings_outlined),
-                   title: const Text("App Settings"),
-                   trailing: const Icon(Icons.chevron_right),
-                   onTap: () {},
+                
+                const SizedBox(height: AppSpacing.xl),
+                
+                // Danger Zone
+                PremiumCard(
+                  onTap: () => _confirmSignOut(context, provider),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                       Icon(Icons.logout, color: Theme.of(context).colorScheme.error),
+                       const SizedBox(width: AppSpacing.md),
+                       Text("Sign Out", style: TextStyle(color: Theme.of(context).colorScheme.error, fontWeight: FontWeight.bold)),
+                    ],
+                  ),
                 ),
-                const Divider(height: 1),
-                ListTile(
-                   leading: const Icon(Icons.logout, color: Colors.red),
-                   title: const Text("Sign Out", style: TextStyle(color: Colors.red)),
-                   onTap: () => _confirmSignOut(context, provider),
+                
+                const SizedBox(height: AppSpacing.xxl),
+                
+                const Center(
+                   child: Text(
+                     "PSG Placement Prep v1.2.0", 
+                     style: TextStyle(color: Colors.grey, fontSize: 10)
+                   )
                 ),
-              ],
+                const SizedBox(height: AppSpacing.xxl),
+              ]),
             ),
-          ),
-          
-          const SizedBox(height: AppSpacing.xxl),
-          Center(
-            child: Text(
-              "Version 1.0.0", 
-              style: Theme.of(context).textTheme.labelSmall?.copyWith(color: Colors.grey)
-            ),
-          ),
+          )
         ],
+      ),
+    );
+  }
+
+  Widget _buildRoleChip(BuildContext context, UserProvider provider) {
+    String label = "Student";
+    Color color = Colors.green;
+    
+    if (provider.isActualPlacementRep) {
+       label = "Placement Rep";
+       color = Colors.purple;
+    } else if (provider.isCoordinator) {
+       label = "Coordinator";
+       color = Colors.orange;
+    } else if (provider.isTeamLeader) {
+       label = "Team Leader";
+       color = Colors.blue;
+    }
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md, vertical: AppSpacing.xs),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(AppRadius.pill),
+        border: Border.all(color: color.withValues(alpha: 0.2)),
+      ),
+      child: Text(
+        label.toUpperCase(),
+        style: TextStyle(color: color, fontWeight: FontWeight.bold, fontSize: 12, letterSpacing: 1.0),
       ),
     );
   }
@@ -115,6 +253,7 @@ class ProfileScreen extends StatelessWidget {
         actions: [
           TextButton(onPressed: () => Navigator.pop(context), child: const Text("Cancel")),
           FilledButton(
+            style: FilledButton.styleFrom(backgroundColor: Theme.of(context).colorScheme.error),
             onPressed: () {
               Navigator.pop(context); // Close dialog
               provider.signOut();
@@ -122,6 +261,26 @@ class ProfileScreen extends StatelessWidget {
             child: const Text("Sign Out")
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _SectionLabel extends StatelessWidget {
+  final String label;
+  const _SectionLabel({required this.label});
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(left: AppSpacing.xs, bottom: AppSpacing.sm),
+      child: Text(
+        label, 
+        style: Theme.of(context).textTheme.labelSmall?.copyWith(
+          fontWeight: FontWeight.bold, 
+          color: Theme.of(context).colorScheme.primary,
+          letterSpacing: 1.2
+        )
       ),
     );
   }
