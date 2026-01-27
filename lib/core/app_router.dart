@@ -80,9 +80,9 @@ class AppRouter {
             return '/';
           }
         } else {
-          // If user is NOT logged in and tries to access protected screens, redirect to login
+          // If user is NOT logged in and tries to access protected screens, redirect to signup
           if (!isAuthPath && currentPath != '/splash') {
-            return '/login';
+            return '/set_password'; // Default to signup for first-time users
           }
         }
 

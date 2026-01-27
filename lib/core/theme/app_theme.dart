@@ -3,127 +3,147 @@ import 'package:google_fonts/google_fonts.dart';
 import 'app_dimens.dart';
 
 class AppTheme {
-  // PSGMX Brand Colors
-  static const Color psgPrimary = Color(0xFFFF6600); // Warm Modern Orange
-  static const Color psgAccent = Color(0xFFFF9933);
-  static const Color textDark = Color(0xFF1F2937);
-  static const Color textLight = Color(0xFFF9FAFB);
-
-  static ThemeData light() {
-    final colorScheme = ColorScheme.fromSeed(
-      seedColor: psgPrimary,
-      brightness: Brightness.light,
-      primary: psgPrimary,
-      onPrimary: Colors.white,
-      secondary: psgAccent,
-      surface: Colors.white, // Pure white
-      surfaceContainerLow: const Color(0xFFF3F4F6), 
-      onSurface: textDark,
-      outline: const Color(0xFFE5E7EB),
-    );
-
-    return _buildTheme(colorScheme);
-  }
+  // PSGMX Brand Colors - Dark Black + Orange
+  static const Color psgOrange = Color(0xFFFF6600); // Vibrant Orange
+  static const Color psgOrangeLight = Color(0xFFFF8833);
+  static const Color psgOrangeDark = Color(0xFFCC5200);
+  
+  static const Color darkBlack = Color(0xFF000000); // Pure Black
+  static const Color darkGray = Color(0xFF0A0A0A); // Slightly lighter black
+  static const Color cardDark = Color(0xFF141414); // Card background
+  static const Color borderDark = Color(0xFF222222); // Borders
+  
+  static const Color textWhite = Color(0xFFFFFFFF);
+  static const Color textGray = Color(0xFFB3B3B3);
 
   static ThemeData dark() {
-    final colorScheme = ColorScheme.fromSeed(
-      seedColor: psgPrimary,
-      brightness: Brightness.dark,
-      surface: const Color(0xFF0A0A0A), // Dark Black
-      onSurface: textLight,
-      outline: const Color(0xFF333333),
+    final colorScheme = ColorScheme.dark(
+      primary: psgOrange,
+      onPrimary: textWhite,
+      secondary: psgOrangeLight,
+      onSecondary: darkBlack,
+      surface: cardDark,
+      onSurface: textWhite,
+      error: Colors.redAccent,
+      onError: textWhite,
+      outline: borderDark,
+      surfaceContainerHighest: darkGray,
     );
-
-    return _buildTheme(colorScheme);
-  }
-
-  static ThemeData _buildTheme(ColorScheme colorScheme) {
-    final isDark = colorScheme.brightness == Brightness.dark;
 
     return ThemeData(
       useMaterial3: true,
       colorScheme: colorScheme,
-      scaffoldBackgroundColor: isDark ? const Color(0xFF000000) : Colors.white,
+      scaffoldBackgroundColor: darkBlack, // Pure black background
       
-      // Typography
+      // Typography - Modern Google Font
       textTheme: GoogleFonts.outfitTextTheme(
-        isDark ? ThemeData.dark().textTheme : ThemeData.light().textTheme,
-      ).apply(
-        bodyColor: colorScheme.onSurface,
-        displayColor: colorScheme.onSurface,
+        ThemeData.dark().textTheme.apply(
+          bodyColor: textWhite,
+          displayColor: textWhite,
+        ),
       ),
-
-      // App Bar
+      
+      // AppBar Theme
       appBarTheme: AppBarTheme(
-        backgroundColor: colorScheme.surface,
-        foregroundColor: colorScheme.onSurface,
+        backgroundColor: darkBlack,
         elevation: 0,
-        scrolledUnderElevation: 2,
-        centerTitle: false,
         titleTextStyle: GoogleFonts.outfit(
-          fontSize: 18,
+          fontSize: 20,
           fontWeight: FontWeight.w600,
-          color: colorScheme.onSurface,
+          color: textWhite,
         ),
+        iconTheme: const IconThemeData(color: psgOrange),
       ),
-
-      // Buttons
-      filledButtonTheme: FilledButtonThemeData(
-        style: FilledButton.styleFrom(
-          padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg, vertical: AppSpacing.md),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppRadius.md)),
-          textStyle: GoogleFonts.outfit(fontWeight: FontWeight.w600),
-          elevation: 0,
-        ),
-      ),
-
-      // Cards
+      
+      // Card Theme
       cardTheme: CardThemeData(
-        color: colorScheme.surface,
-        elevation: 0, // We will handle elevation via shadows in PremiumCard
-        margin: EdgeInsets.zero,
+        color: cardDark,
+        elevation: 0,
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(AppRadius.md),
-          side: BorderSide(
-            color: colorScheme.outline.withValues(alpha: 0.5),
-            width: 1,
-          ),
+          borderRadius: BorderRadius.circular(AppRadius.lg),
+          side: const BorderSide(color: borderDark, width: 1),
         ),
       ),
-
-      // Navigation Bar
-      navigationBarTheme: NavigationBarThemeData(
-        backgroundColor: colorScheme.surface,
-        elevation: 0,
-        height: 70,
-        indicatorColor: colorScheme.primary.withValues(alpha: 0.1),
-        labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
-        iconTheme: WidgetStateProperty.resolveWith((states) {
-          if (states.contains(WidgetState.selected)) {
-            return IconThemeData(color: colorScheme.primary);
-          }
-          return IconThemeData(color: colorScheme.onSurfaceVariant);
-        }),
-      ),
-
-      // Inputs
+      
+      // Input Decoration Theme
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
-        fillColor: isDark ? const Color(0xFF1F2937) : Colors.white,
-        contentPadding: const EdgeInsets.all(AppSpacing.md),
+        fillColor: cardDark,
+        hintStyle: const TextStyle(color: textGray, fontSize: 14),
+        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(AppRadius.md),
-          borderSide: BorderSide(color: colorScheme.outline),
+          borderSide: const BorderSide(color: borderDark, width: 1),
         ),
         enabledBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(AppRadius.md),
-          borderSide: BorderSide(color: colorScheme.outline),
+          borderSide: const BorderSide(color: borderDark, width: 1),
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(AppRadius.md),
-          borderSide: BorderSide(color: colorScheme.primary, width: 2),
+          borderSide: const BorderSide(color: psgOrange, width: 2),
         ),
+        errorBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(AppRadius.md),
+          borderSide: const BorderSide(color: Colors.redAccent, width: 1),
+        ),
+        focusedErrorBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(AppRadius.md),
+          borderSide: const BorderSide(color: Colors.redAccent, width: 2),
+        ),
+      ),
+      
+      // Filled Button Theme (Primary Actions)
+      filledButtonTheme: FilledButtonThemeData(
+        style: FilledButton.styleFrom(
+          backgroundColor: psgOrange,
+          foregroundColor: textWhite,
+          textStyle: GoogleFonts.outfit(fontSize: 16, fontWeight: FontWeight.w600),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(AppRadius.md),
+          ),
+          padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 24),
+        ),
+      ),
+      
+      // Outlined Button Theme (Secondary Actions)
+      outlinedButtonTheme: OutlinedButtonThemeData(
+        style: OutlinedButton.styleFrom(
+          foregroundColor: psgOrange,
+          textStyle: GoogleFonts.outfit(fontSize: 16, fontWeight: FontWeight.w600),
+          side: const BorderSide(color: psgOrange, width: 1.5),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(AppRadius.md),
+          ),
+          padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 24),
+        ),
+      ),
+      
+      // Text Button Theme
+      textButtonTheme: TextButtonThemeData(
+        style: TextButton.styleFrom(
+          foregroundColor: psgOrange,
+          textStyle: GoogleFonts.outfit(fontSize: 14, fontWeight: FontWeight.w600),
+        ),
+      ),
+      
+      // Bottom Navigation Bar Theme
+      bottomNavigationBarTheme: const BottomNavigationBarThemeData(
+        backgroundColor: cardDark,
+        selectedItemColor: psgOrange,
+        unselectedItemColor: textGray,
+        type: BottomNavigationBarType.fixed,
+        elevation: 0,
+      ),
+      
+      // Divider Theme
+      dividerTheme: const DividerThemeData(
+        color: borderDark,
+        thickness: 1,
       ),
     );
   }
+
+  // For compatibility, light theme redirects to dark
+  static ThemeData light() => dark();
 }

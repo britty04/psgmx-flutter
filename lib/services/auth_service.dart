@@ -79,10 +79,16 @@ class AuthService {
       // Step 2: Send OTP via Supabase Auth with retry logic
       debugPrint('[AuthService] Step 4: Sending OTP code to: $email');
       
+      
       try {
+        // NOTE: For this to send an OTP via email, the 'Confirm Signup' template
+        // in Supabase > Authentication > Email Templates MUST be configured to use {{ .Token }}
+        // instead of {{ .ConfirmationURL }}.
+        // If the user receives a link, it means Supabase is sending the default template.
         await _supabaseService.auth.signInWithOtp(
           email: email,
           shouldCreateUser: true,
+          // user_metadata is optional, but can initially set basic info if needed
         );
         
         debugPrint('[AuthService] Step 5: OTP sent successfully to: $email');
@@ -453,45 +459,122 @@ class AuthService {
     }
   }
 
-  /// Ensure user document exists (create if not exists)
-  /// 
-  /// Used after successful sign-up/OTP verification
-  Future<AppUser> ensureUserDocument(String userId, String email) async {
-    try {
-      // Try to fetch existing user
-      final existingUser = await getUserProfile(userId);
-      if (existingUser != null) {
-        return existingUser;
-      }
 
-      // Create new user profile with minimal info
-      debugPrint('[AuthService] Creating new user profile for: $email');
-      final newUserData = {
-        'id': userId,
+
+  /// PRODUCTION: Check if user needs first-time password setup
+  /// 
+  /// Returns true if:
+  /// - Email exists in whitelist (authorized user)
+  /// - Email does NOT have auth.users account (needs password setup)
+  /// 
+  /// Use case: Detect new students who need to complete OTP → password flow
+  Future<bool> isFirstTimeUser(String email) async {
+    try {
+      email = email.trim().toLowerCase();
+      
+      debugPrint('[AuthService] Checking if first-time user: $email');
+      
+      // Step 1: Check if email in whitelist (authorized?)
+      final whitelistEntry = await _supabaseService.client
+          .from('whitelist')
+          .select()
+          .eq('email', email)
+          .maybeSingle();
+      
+      if (whitelistEntry == null) {
+        debugPrint('[AuthService] Email not authorized (not in whitelist)');
+        return false; // Not authorized at all
+      }
+      
+      debugPrint('[AuthService] Email authorized: ${whitelistEntry['name']}');
+      
+      // Step 2: Check if user already has account (exists in users table)
+      final userEntry = await _supabaseService.client
+          .from('users')
+          .select('id')
+          .eq('email', email)
+          .maybeSingle();
+      
+      final isFirstTime = (userEntry == null);
+      
+      if (isFirstTime) {
+        debugPrint('[AuthService] FIRST-TIME USER detected - needs password setup');
+      } else {
+        debugPrint('[AuthService] RETURNING USER - has existing account');
+      }
+      
+      return isFirstTime;
+      
+    } catch (e) {
+      debugPrint('[AuthService] Error checking first-time user: $e');
+      return false; // Default to false on error
+    }
+  }
+
+  /// PRODUCTION: Create user profile from whitelist data
+  /// 
+  /// Called after first-time user completes OTP + password setup
+  /// Automatically populates user profile from whitelist
+  /// 
+  /// Prerequisites:
+  /// - User authenticated (has auth.users entry with authUserId)
+  /// - Email exists in whitelist
+  /// 
+  /// Returns: Newly created AppUser
+  Future<AppUser> createUserFromWhitelist(String authUserId, String email) async {
+    try {
+      email = email.trim().toLowerCase();
+      
+      debugPrint('[AuthService] Creating user profile from whitelist: $email');
+      
+      // Step 1: Fetch whitelist data
+      final whitelistData = await _supabaseService.client
+          .from('whitelist')
+          .select()
+          .eq('email', email)
+          .single(); // Throws if not found
+      
+      debugPrint('[AuthService] Whitelist data found: ${whitelistData['name']}');
+      
+      // Step 2: Create user in users table with whitelist data
+      final userData = {
+        'id': authUserId,
         'email': email,
-        'name': email.split('@')[0], // Temporary name
-        'reg_no': email.split('@')[0].toUpperCase(),
-        'batch': 'G1', // Default batch
-        'roles': {
+        'reg_no': whitelistData['reg_no'] ?? email.split('@')[0].toUpperCase(),
+        'name': whitelistData['name'] ?? 'Student',
+        'batch': whitelistData['batch'] ?? 'G1',
+        'team_id': whitelistData['team_id'],
+        'roles': whitelistData['roles'] ?? {
           'isStudent': true,
           'isTeamLeader': false,
           'isCoordinator': false,
           'isPlacementRep': false,
         },
+        'dob': whitelistData['dob'],
+        'leetcode_username': whitelistData['leetcode_username'],
+        'birthday_notifications_enabled': true,
+        'leetcode_notifications_enabled': true,
       };
-
+      
+      debugPrint('[AuthService] Inserting user profile into users table...');
+      
       await _supabaseService.client
           .from('users')
-          .insert(newUserData);
-
-      final createdUser = await getUserProfile(userId);
+          .insert(userData);
+      
+      debugPrint('[AuthService] User profile created successfully');
+      
+      // Step 3: Fetch and return created user
+      final createdUser = await getUserProfile(authUserId);
+      
       if (createdUser == null) {
-        throw Exception('Failed to create user profile');
+        throw Exception('User profile created but failed to fetch');
       }
-
+      
       return createdUser;
+      
     } catch (e) {
-      debugPrint('[AuthService] Error ensuring user document: $e');
+      debugPrint('[AuthService] Error creating user from whitelist: $e');
       rethrow;
     }
   }

@@ -101,9 +101,9 @@ class _VerifyOtpScreenState extends State<VerifyOtpScreen> {
       await Future.delayed(const Duration(milliseconds: 500));
 
       if (!mounted) return;
-      debugPrint('[VerifyOtpScreen] Navigating to dashboard...');
-      // Navigate to dashboard on success
-      context.go('/dashboard');
+      debugPrint('[VerifyOtpScreen] Navigating to home...');
+      // Navigate to home on success
+      context.go('/');
     } catch (e) {
       if (!mounted) return;
       debugPrint('[VerifyOtpScreen] Error: $e');

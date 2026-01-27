@@ -593,13 +593,25 @@ class _BulkUploadFormState extends State<_BulkUploadForm> {
 
        if (tasks.isEmpty) throw Exception("No valid rows found. Please check file format.");
        
+        // Deduplication: Use Map to keep only latest entry per date
+        final taskMap = <String, CompositeTask>{};
+        for (final task in tasks) {
+          taskMap[task.date] = task; // Later entries override earlier ones
+        }
+        final deduplicatedTasks = taskMap.values.toList();
+        
+        // Show info if duplicates were found
+        if (deduplicatedTasks.length < tasks.length) {
+          debugPrint('Deduplicated: ${tasks.length} rows → ${deduplicatedTasks.length} unique dates');
+        }
+        
        if (!mounted) return;
        final dbService = Provider.of<SupabaseDbService>(context, listen: false);
-       await dbService.bulkPublishTasks(tasks);
+       await dbService.bulkPublishTasks(deduplicatedTasks);
        
        if (mounted) {
           setState(() { 
-            _statusMessage = "Success! ${tasks.length} tasks scheduled."; 
+            _statusMessage = "Success! ${deduplicatedTasks.length} unique tasks scheduled."; 
             _isError = false; 
           });
        }

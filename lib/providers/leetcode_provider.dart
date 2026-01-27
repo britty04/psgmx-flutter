@@ -3,9 +3,11 @@ import 'package:http/http.dart' as http;
 import 'package:flutter/foundation.dart';
 import '../models/leetcode_stats.dart';
 import '../services/supabase_service.dart';
+import '../services/data_seed_service.dart';
 
 class LeetCodeProvider extends ChangeNotifier {
   final SupabaseService _supabaseService;
+  late final DataSeedService _dataSeedService;
   
   bool _isLoading = false;
   bool get isLoading => _isLoading;
@@ -20,7 +22,9 @@ class LeetCodeProvider extends ChangeNotifier {
   
   DateTime? _lastBatchUpdate;
   
-  LeetCodeProvider(this._supabaseService);
+  LeetCodeProvider(this._supabaseService) {
+    _dataSeedService = DataSeedService(_supabaseService);
+  }
   
   // Check if we need to refresh (every 12 hours)
   bool get needsRefresh {
@@ -80,7 +84,7 @@ class LeetCodeProvider extends ChangeNotifier {
           final stats = LeetCodeStats.fromMap(dbData);
           _statsCache[username] = stats;
           
-          // If Supabase data is fresh (< 12 hours), stop here
+          // If Supabase data is fresh (<12 hours), stop here
           if (DateTime.now().difference(stats.lastUpdated).inHours < 12) {
             _pendingRequests.remove(username);
             _isLoading = false;
@@ -138,22 +142,74 @@ class LeetCodeProvider extends ChangeNotifier {
 
   Future<List<LeetCodeStats>> fetchAllUsers() async {
     try {
-      final response = await _supabaseService.client
+      // 1. Fetch ALL whitelisted students (Source of Truth for Names)
+      final whitelistResponse = await _supabaseService.client
+          .from('whitelist')
+          .select('leetcode_username, name');
+          
+      final nameMap = <String, String>{};
+      final whitelistUsernames = <String>{};
+      
+      for (var entry in whitelistResponse as List) {
+        final username = entry['leetcode_username'] as String?;
+        final name = entry['name'] as String?;
+        if (username != null && username.isNotEmpty) {
+           final cleanUser = _cleanUsername(username);
+           whitelistUsernames.add(cleanUser);
+           if (name != null) {
+             nameMap[cleanUser] = name;
+           }
+        }
+      }
+
+      // 2. Fetch ALL stats from database
+      final statsResponse = await _supabaseService.client
           .from('leetcode_stats')
           .select()
           .order('total_solved', ascending: false)
-          .limit(200); // Increased to support all 123 students
+          .limit(200); 
       
-      final users = (response as List).map((e) => LeetCodeStats.fromMap(e)).toList();
-      _allUsers = users;
+      final dbStatsList = (statsResponse as List).map((e) => LeetCodeStats.fromMap(e)).toList();
+      
+      // 3. Merge: Add names to stats AND include users with no stats (yet)
+      final mergedUsers = <LeetCodeStats>[];
+      final seenUsernames = <String>{};
+      
+      // First, add existing stats and attach names
+      for (var stat in dbStatsList) {
+        final cleanUser = _cleanUsername(stat.username);
+        seenUsernames.add(cleanUser);
+        
+        // Attach name if available
+        if (nameMap.containsKey(cleanUser)) {
+           mergedUsers.add(stat.copyWith(name: nameMap[cleanUser]));
+        } else {
+           mergedUsers.add(stat);
+        }
+      }
+      
+      // Second, add students from whitelist who have no stats entry yet (create empty placeholder)
+      // This ensures they appear in the list (at bottom) until fetched
+      for (var username in whitelistUsernames) {
+        if (!seenUsernames.contains(username)) {
+           mergedUsers.add(
+             LeetCodeStats.empty(username).copyWith(name: nameMap[username])
+           );
+        }
+      }
+      
+      // Sort again just to be safe (Total solved desc)
+      mergedUsers.sort((a, b) => b.totalSolved.compareTo(a.totalSolved));
+
+      _allUsers = mergedUsers;
       
       // Update cache
-      for (var user in users) {
+      for (var user in mergedUsers) {
         _statsCache[user.username] = user;
       }
       
       notifyListeners();
-      return users;
+      return mergedUsers;
     } catch (e) {
       debugPrint('Error fetching all users: $e');
       return _allUsers; // Return cached data
@@ -184,9 +240,13 @@ class LeetCodeProvider extends ChangeNotifier {
     notifyListeners();
     
     try {
-      // 1. Get all users with LeetCode usernames
+      // 0. ENSURE WHITELIST IS SEEDED (Auto-Populate if Empty)
+      await _dataSeedService.ensureWhitelistSeeded();
+      
+      // 1. Get all leetcode usernames from WHITELIST (Source of Truth)
+      // This checks EVERY student, not just those who signed up
       final usersResponse = await _supabaseService.client
-          .from('users')
+          .from('whitelist')
           .select('leetcode_username')
           .not('leetcode_username', 'is', null);
       
@@ -197,8 +257,10 @@ class LeetCodeProvider extends ChangeNotifier {
           usernames.add(_cleanUsername(username));
         }
       }
+      
+      debugPrint('[LeetCode] Found ${usernames.length} students to refresh');
 
-      // 2. Show current database data first
+      // 2. Show current database data first (with names attached)
       await fetchAllUsers();
 
       // 3. Fetch fresh data from LeetCode API

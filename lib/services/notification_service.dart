@@ -65,6 +65,78 @@ class NotificationService {
     await _notifications.cancel(101);
   }
 
+  /// Schedule birthday notification at midnight on user's birthday
+  /// Returns true if scheduled successfully
+  Future<bool> scheduleBirthdayNotification({
+    required DateTime dob,
+    required String userName,
+    required bool enabled,
+  }) async {
+    if (!enabled) {
+      await cancelBirthdayNotification();
+      return false;
+    }
+
+    final now = tz.TZDateTime.now(tz.local);
+    final firstName = userName.split(' ').first;
+    
+    // Calculate next birthday at midnight
+    var birthdayDate = tz.TZDateTime(
+      tz.local,
+      now.year,
+      dob.month,
+      dob.day,
+      0, // Midnight
+      0,
+    );
+    
+    // If birthday already passed this year, schedule for next year
+    if (birthdayDate.isBefore(now)) {
+      birthdayDate = tz.TZDateTime(
+        tz.local,
+        now.year + 1,
+        dob.month,
+        dob.day,
+        0,
+        0,
+      );
+    }
+
+    try {
+      await _notifications.zonedSchedule(
+        200, // Birthday notification ID
+        '🎂 Happy Birthday, $firstName!',
+        'Wishing you a fantastic year ahead filled with success and happiness! 🎉',
+        birthdayDate,
+        const NotificationDetails(
+          android: AndroidNotificationDetails(
+            'psgmx_birthday',
+            'Birthday Notifications',
+            importance: Importance.high,
+            priority: Priority.high,
+            color: Color(0xFFFF6B6B),
+            playSound: true,
+          ),
+          iOS: DarwinNotificationDetails(
+            presentSound: true,
+            presentAlert: true,
+            presentBadge: true,
+          ),
+        ),
+        androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
+        matchDateTimeComponents: DateTimeComponents.dateAndTime,
+      );
+      return true;
+    } catch (e) {
+      debugPrint('Failed to schedule birthday notification: $e');
+      return false;
+    }
+  }
+
+  Future<void> cancelBirthdayNotification() async {
+    await _notifications.cancel(200);
+  }
+
   Future<void> _scheduleDaily({
     required int id,
     required String title,

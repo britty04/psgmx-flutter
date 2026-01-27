@@ -14,6 +14,7 @@ import 'widgets/leetcode_leaderboard.dart';
 import 'widgets/attendance_action_card.dart';
 import 'widgets/announcements_list.dart';
 import 'widgets/create_announcement_dialog.dart';
+import 'widgets/birthday_greeting_card.dart';
 import '../attendance/daily_attendance_sheet.dart';
 
 class HomeScreen extends StatefulWidget {
@@ -182,8 +183,14 @@ class _HomeScreenState extends State<HomeScreen> {
                   // 1. Welcome Header
                   _buildWelcomeHeader(context, user.name),
                   const SizedBox(height: AppSpacing.xl),
+                  
+                  // 2. Birthday Greeting (if today is birthday)
+                  if (_isBirthday(user.dob)) ...[
+                    BirthdayGreetingCard(userName: user.name),
+                    const SizedBox(height: AppSpacing.xl),
+                  ],
   
-                  // 2. Hero Component: Daily Quote
+                  // 3. Hero Component: Daily Quote
                   _QuoteCard(service: quoteService),
                   const SizedBox(height: AppSpacing.xxl),
                   
@@ -292,6 +299,12 @@ class _HomeScreenState extends State<HomeScreen> {
         ),
       ],
     );
+  }
+
+  bool _isBirthday(DateTime? dob) {
+    if (dob == null) return false;
+    final now = DateTime.now();
+    return dob.month == now.month && dob.day == now.day;
   }
 }
 

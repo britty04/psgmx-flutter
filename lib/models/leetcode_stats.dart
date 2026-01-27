@@ -1,5 +1,6 @@
 class LeetCodeStats {
   final String username;
+  final String? name; // Added name field
   final int totalSolved;
   final int easySolved;
   final int mediumSolved;
@@ -10,6 +11,7 @@ class LeetCodeStats {
 
   LeetCodeStats({
     required this.username,
+    this.name, 
     required this.totalSolved,
     required this.easySolved,
     required this.mediumSolved,
@@ -22,6 +24,7 @@ class LeetCodeStats {
   factory LeetCodeStats.fromMap(Map<String, dynamic> map) {
     return LeetCodeStats(
       username: map['username'] ?? '',
+      name: map['name'], // Map name from DB join or passed value
       totalSolved: map['total_solved'] ?? 0,
       easySolved: map['easy_solved'] ?? 0,
       mediumSolved: map['medium_solved'] ?? 0,
@@ -35,6 +38,7 @@ class LeetCodeStats {
   Map<String, dynamic> toMap() {
     return {
       'username': username,
+      // 'name': name, // Name is usually not stored in stats table, but joined
       'total_solved': totalSolved,
       'easy_solved': easySolved,
       'medium_solved': mediumSolved,
@@ -55,6 +59,20 @@ class LeetCodeStats {
       hardSolved: 0, 
       ranking: 0, 
       lastUpdated: DateTime.now()
+    );
+  }
+  
+  LeetCodeStats copyWith({String? name}) {
+    return LeetCodeStats(
+      username: username,
+      name: name ?? this.name,
+      totalSolved: totalSolved,
+      easySolved: easySolved,
+      mediumSolved: mediumSolved,
+      hardSolved: hardSolved,
+      ranking: ranking,
+      weeklyScore: weeklyScore,
+      lastUpdated: lastUpdated,
     );
   }
 }

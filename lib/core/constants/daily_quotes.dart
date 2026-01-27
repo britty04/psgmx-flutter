@@ -75,7 +75,9 @@ class DailyQuotes {
   ];
 
   static String getQuoteForToday() {
-    final dayOfYear = int.parse("${DateTime.now().year}${DateTime.now().month}${DateTime.now().day}") % 1000; // Simple pseudo hash
+    final now = DateTime.now();
+    // Calculate day of year (1-365/366)
+    final dayOfYear = now.difference(DateTime(now.year, 1, 1)).inDays;
     final index = dayOfYear % quotes.length;
     return quotes[index];
   }
