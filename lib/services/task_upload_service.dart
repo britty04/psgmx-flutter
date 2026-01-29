@@ -174,72 +174,85 @@ class TaskUploadService {
   Future<List<TaskUploadSheet>> _parseExcelFile(Uint8List fileBytes) async {
     try {
       final excel = Excel.decodeBytes(fileBytes);
-      final sheets = <TaskUploadSheet>[];
+      
+      // Use the first sheet only (unified format)
+      final firstSheetName = excel.tables.keys.first;
+      final sheet = excel.tables[firstSheetName];
+      
+      if (sheet == null) {
+        throw Exception('No valid sheet found');
+      }
 
-      for (final sheetName in excel.tables.keys) {
-        final sheet = excel.tables[sheetName];
-        if (sheet == null) continue;
+      final leetCodeRows = <TaskUploadRow>[];
+      final coreRows = <TaskUploadRow>[];
 
-        final topicType = _detectTopicType(sheetName);
-        final rows = <TaskUploadRow>[];
+      // Expected columns: Date, Leetcode Topic, Leetcode URL, Core CS Topic, Description
+      for (var i = 1; i < sheet.rows.length; i++) {
+        final row = sheet.rows[i];
+        if (row.isEmpty) continue;
 
-        // Expected columns for LeetCode: Date, Topic, Question (URL)
-        // Expected columns for Core: Date, Subject, Topic
+        try {
+          final dateStr = row[0]?.value?.toString() ?? '';
+          if (dateStr.isEmpty) continue;
+          
+          final date = _parseDate(dateStr);
+          final leetcodeTopic = row.length > 1 ? (row[1]?.value?.toString() ?? '').trim() : '';
+          final leetcodeUrl = row.length > 2 ? (row[2]?.value?.toString() ?? '').trim() : '';
+          final coreSubject = row.length > 3 ? (row[3]?.value?.toString() ?? '').trim() : '';
+          final description = row.length > 4 ? (row[4]?.value?.toString() ?? '').trim() : '';
 
-        for (var i = 1; i < sheet.rows.length; i++) {
-          // Skip header
-          final row = sheet.rows[i];
-          if (row.isEmpty) continue;
-
-          try {
-            final date = _parseDate(row[0]?.value?.toString() ?? '');
-            
-            if (topicType == TopicType.leetcode) {
-              // LeetCode format
-              final topic = row.length > 1 ? row[1]?.value?.toString() : null;
-              final url = row.length > 2 ? row[2]?.value?.toString() : null;
-
-              if (topic == null || topic.isEmpty) {
-                throw Exception('Missing topic');
-              }
-
-              rows.add(TaskUploadRow(
-                date: date,
-                title: topic,
-                referenceLink: url,
-                topicType: TopicType.leetcode,
-              ));
-            } else {
-              // Core format
-              final subject = row.length > 1 ? row[1]?.value?.toString() : null;
-              final topic = row.length > 2 ? row[2]?.value?.toString() : null;
-
-              if (subject == null || subject.isEmpty || topic == null || topic.isEmpty) {
-                throw Exception('Missing subject or topic');
-              }
-
-              rows.add(TaskUploadRow(
-                date: date,
-                title: topic,
-                subject: subject,
-                topicType: TopicType.core,
-              ));
-            }
-          } catch (e) {
-            rows.add(TaskUploadRow(
-              date: DateTime.now(),
-              title: 'Error',
-              topicType: topicType,
-              error: 'Sheet "$sheetName", Row ${i + 1}: ${e.toString()}',
+          // Add LeetCode task if topic is present
+          if (leetcodeTopic.isNotEmpty) {
+            leetCodeRows.add(TaskUploadRow(
+              date: date,
+              title: leetcodeTopic,
+              referenceLink: leetcodeUrl.isNotEmpty ? leetcodeUrl : null,
+              topicType: TopicType.leetcode,
             ));
           }
-        }
 
+          // Add Core CS task if subject is present
+          if (coreSubject.isNotEmpty) {
+            coreRows.add(TaskUploadRow(
+              date: date,
+              title: description.isNotEmpty ? description : coreSubject,
+              subject: coreSubject,
+              topicType: TopicType.core,
+            ));
+          }
+        } catch (e) {
+          // Add error row to both sheets to maintain visibility
+          final errorRow = TaskUploadRow(
+            date: DateTime.now(),
+            title: 'Error',
+            topicType: TopicType.core,
+            error: 'Row ${i + 1}: ${e.toString()}',
+          );
+          leetCodeRows.add(errorRow);
+          coreRows.add(errorRow);
+        }
+      }
+
+      final sheets = <TaskUploadSheet>[];
+      
+      if (leetCodeRows.isNotEmpty) {
         sheets.add(TaskUploadSheet(
-          sheetName: sheetName,
-          topicType: topicType,
-          rows: rows,
+          sheetName: 'LeetCode Tasks',
+          topicType: TopicType.leetcode,
+          rows: leetCodeRows,
         ));
+      }
+      
+      if (coreRows.isNotEmpty) {
+        sheets.add(TaskUploadSheet(
+          sheetName: 'Core CS Tasks',
+          topicType: TopicType.core,
+          rows: coreRows,
+        ));
+      }
+
+      if (sheets.isEmpty) {
+        throw Exception('No valid tasks found in the file');
       }
 
       return sheets;
@@ -390,34 +403,47 @@ class TaskUploadService {
   Uint8List generateExcelTemplate() {
     final excel = Excel.createExcel();
 
-    // LeetCode Questions sheet
-    final leetSheet = excel['LeetCode Questions'];
-    leetSheet.appendRow([
+    // Single unified sheet
+    final sheet = excel['Tasks'];
+    
+    // Header row
+    sheet.appendRow([
       TextCellValue('Date'),
-      TextCellValue('Topic'),
-      TextCellValue('Question URL'),
+      TextCellValue('Leetcode Topic'),
+      TextCellValue('Leetcode URL'),
+      TextCellValue('Core CS Topic'),
+      TextCellValue('Description'),
     ]);
-    leetSheet.appendRow([
-      TextCellValue('2026-01-23'),
+    
+    // Example rows
+    sheet.appendRow([
+      TextCellValue('2026-01-29'),
       TextCellValue('Two Sum'),
       TextCellValue('https://leetcode.com/problems/two-sum/'),
-    ]);
-
-    // General Topics sheet
-    final coreSheet = excel['General Topics'];
-    coreSheet.appendRow([
-      TextCellValue('Date'),
-      TextCellValue('Subject'),
-      TextCellValue('Topic'),
-    ]);
-    coreSheet.appendRow([
-      TextCellValue('2026-01-23'),
-      TextCellValue('Data Structures'),
       TextCellValue('Binary Search Trees'),
+      TextCellValue('Understanding BST operations and traversals'),
+    ]);
+    
+    sheet.appendRow([
+      TextCellValue('2026-01-30'),
+      TextCellValue(''),
+      TextCellValue(''),
+      TextCellValue('Dynamic Programming'),
+      TextCellValue('Introduction to DP with memoization'),
+    ]);
+    
+    sheet.appendRow([
+      TextCellValue('2026-01-31'),
+      TextCellValue('Valid Parentheses'),
+      TextCellValue('https://leetcode.com/problems/valid-parentheses/'),
+      TextCellValue(''),
+      TextCellValue(''),
     ]);
 
     // Remove default sheet
-    excel.delete('Sheet1');
+    if (excel.tables.containsKey('Sheet1')) {
+      excel.delete('Sheet1');
+    }
 
     return Uint8List.fromList(excel.encode()!);
   }

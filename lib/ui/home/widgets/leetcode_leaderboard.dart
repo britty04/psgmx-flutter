@@ -4,7 +4,6 @@ import '../../../providers/leetcode_provider.dart';
 import '../../../models/leetcode_stats.dart';
 import '../../../core/theme/app_dimens.dart';
 import '../../../services/supabase_service.dart';
-import 'dart:math' as math;
 
 class LeetCodeLeaderboard extends StatefulWidget {
   const LeetCodeLeaderboard({super.key});

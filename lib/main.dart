@@ -100,7 +100,7 @@ class _PsgMxAppInnerState extends State<PsgMxAppInner> {
   @override
   Widget build(BuildContext context) {
     return MaterialApp.router(
-      title: 'PSG MCA Prep',
+      title: 'PSGMX - Placement Excellence',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.light(),
       darkTheme: AppTheme.dark(),

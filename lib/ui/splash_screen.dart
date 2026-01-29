@@ -1,9 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:go_router/go_router.dart';
-import 'package:provider/provider.dart';
-import '../providers/user_provider.dart';
-import 'dart:math' as math;
+import 'package:google_fonts/google_fonts.dart';
 
+/// Modern Minimal Splash Screen for PSGMX
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
 
@@ -13,282 +11,173 @@ class SplashScreen extends StatefulWidget {
 
 class _SplashScreenState extends State<SplashScreen>
     with SingleTickerProviderStateMixin {
-  // Failsafe timer
-  bool _showRetry = false;
-  late AnimationController _animationController;
+  late AnimationController _controller;
   late Animation<double> _fadeAnimation;
   late Animation<double> _scaleAnimation;
-  late Animation<double> _rotationAnimation;
 
   @override
   void initState() {
     super.initState();
 
-    // Setup animations
-    _animationController = AnimationController(
-      duration: const Duration(milliseconds: 2000),
+    _controller = AnimationController(
+      duration: const Duration(milliseconds: 1500),
       vsync: this,
-    )..repeat(reverse: true);
-
-    _fadeAnimation = Tween<double>(begin: 0.5, end: 1.0).animate(
-      CurvedAnimation(parent: _animationController, curve: Curves.easeInOut),
     );
 
-    _scaleAnimation = Tween<double>(begin: 0.95, end: 1.05).animate(
-      CurvedAnimation(parent: _animationController, curve: Curves.easeInOut),
+    _fadeAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
+      CurvedAnimation(
+        parent: _controller,
+        curve: const Interval(0.0, 0.6, curve: Curves.easeOut),
+      ),
     );
 
-    _rotationAnimation = Tween<double>(begin: 0.0, end: 2 * math.pi).animate(
-      CurvedAnimation(parent: _animationController, curve: Curves.linear),
+    _scaleAnimation = Tween<double>(begin: 0.8, end: 1.0).animate(
+      CurvedAnimation(
+        parent: _controller,
+        curve: const Interval(0.0, 0.8, curve: Curves.easeOutBack),
+      ),
     );
 
-    // Start a failsafe timer
-    Future.delayed(const Duration(seconds: 8), () {
-      if (mounted) {
-        setState(() => _showRetry = true);
-      }
-    });
+    _controller.forward();
   }
 
   @override
   void dispose() {
-    _animationController.dispose();
+    _controller.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final primaryColor = Theme.of(context).colorScheme.primary;
+    final colorScheme = Theme.of(context).colorScheme;
 
     return Scaffold(
-      body: Container(
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: isDark
-                ? [
-                    const Color(0xFF0A0A0A),
-                    const Color(0xFF1A1A1A),
-                    const Color(0xFF2D1810),
-                  ]
-                : [
-                    Colors.orange.shade50,
-                    Colors.white,
-                    Colors.orange.shade100,
-                  ],
-          ),
-        ),
-        child: Center(
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              // Animated Logo Container
-              AnimatedBuilder(
-                animation: _animationController,
-                builder: (context, child) {
-                  return Transform.scale(
-                    scale: _scaleAnimation.value,
-                    child: FadeTransition(
-                      opacity: _fadeAnimation,
-                      child: Container(
-                        width: 120,
-                        height: 120,
-                        decoration: BoxDecoration(
-                          gradient: LinearGradient(
-                            colors: [
-                              primaryColor,
-                              primaryColor.withValues(alpha: 180/255),
+      backgroundColor: isDark ? const Color(0xFF0A0A0A) : Colors.white,
+      body: SafeArea(
+        child: AnimatedBuilder(
+          animation: _controller,
+          builder: (context, child) {
+            return Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  const Spacer(flex: 2),
+
+                  // Logo with Clean Animation
+                  FadeTransition(
+                    opacity: _fadeAnimation,
+                    child: ScaleTransition(
+                      scale: _scaleAnimation,
+                      child: Hero(
+                        tag: 'psgmx_logo',
+                        child: Container(
+                          width: 180,
+                          height: 180,
+                          decoration: BoxDecoration(
+                            borderRadius: BorderRadius.circular(90),
+                            boxShadow: [
+                              BoxShadow(
+                                color: colorScheme.primary.withValues(alpha: 0.15),
+                                blurRadius: 30,
+                                spreadRadius: 5,
+                              ),
                             ],
                           ),
-                          borderRadius: BorderRadius.circular(30),
-                          boxShadow: [
-                            BoxShadow(
-                              color: primaryColor.withValues(alpha: 100/255),
-                              blurRadius: 30,
-                              spreadRadius: 5,
-                            ),
-                          ],
-                        ),
-                        child: Stack(
-                          children: [
-                            // Animated rotating ring
-                            Positioned.fill(
-                              child: AnimatedBuilder(
-                                animation: _rotationAnimation,
-                                builder: (context, child) {
-                                  return Transform.rotate(
-                                    angle: _rotationAnimation.value,
-                                    child: CustomPaint(
-                                      painter: _CircleRingPainter(primaryColor),
+                          child: ClipRRect(
+                            borderRadius: BorderRadius.circular(90),
+                            child: Image.asset(
+                              'assets/images/psgmx_logo_transparent.png',
+                              fit: BoxFit.contain,
+                              errorBuilder: (context, error, stackTrace) {
+                                return Container(
+                                  decoration: BoxDecoration(
+                                    gradient: LinearGradient(
+                                      begin: Alignment.topLeft,
+                                      end: Alignment.bottomRight,
+                                      colors: [
+                                        colorScheme.primary,
+                                        colorScheme.secondary,
+                                      ],
                                     ),
-                                  );
-                                },
-                              ),
+                                    borderRadius: BorderRadius.circular(90),
+                                  ),
+                                  child: Center(
+                                    child: Text(
+                                      'P',
+                                      style: GoogleFonts.poppins(
+                                        fontSize: 72,
+                                        fontWeight: FontWeight.bold,
+                                        color: Colors.white,
+                                      ),
+                                    ),
+                                  ),
+                                );
+                              },
                             ),
-                            // Center Icon
-                            const Center(
-                              child: Icon(
-                                Icons.school_rounded,
-                                size: 56,
-                                color: Colors.white,
-                              ),
-                            ),
-                          ],
+                          ),
                         ),
                       ),
                     ),
-                  );
-                },
-              ),
-
-              const SizedBox(height: 32),
-
-              // App Title with gradient
-              ShaderMask(
-                shaderCallback: (bounds) => LinearGradient(
-                  colors: [primaryColor, primaryColor.withValues(alpha: 180/255)],
-                ).createShader(bounds),
-                child: const Text(
-                  'PSG MCA',
-                  style: TextStyle(
-                    fontSize: 36,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.white,
-                    letterSpacing: 2,
                   ),
-                ),
-              ),
 
-              const SizedBox(height: 8),
+                  const SizedBox(height: 40),
 
-              Text(
-                'Placement Prep',
-                style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.w500,
-                  color: isDark ? Colors.grey[400] : Colors.grey[700],
-                  letterSpacing: 1,
-                ),
-              ),
-
-              const SizedBox(height: 48),
-
-              // Modern Loading Indicator
-              SizedBox(
-                width: 40,
-                height: 40,
-                child: CircularProgressIndicator(
-                  strokeWidth: 3,
-                  valueColor: AlwaysStoppedAnimation<Color>(primaryColor),
-                ),
-              ),
-
-              const SizedBox(height: 16),
-
-              AnimatedBuilder(
-                animation: _fadeAnimation,
-                builder: (context, child) {
-                  return Opacity(
-                    opacity: _fadeAnimation.value,
+                  // Brand Name - Clean Typography
+                  FadeTransition(
+                    opacity: _fadeAnimation,
                     child: Text(
-                      'Loading your workspace...',
-                      style: TextStyle(
-                        fontSize: 14,
-                        color: isDark ? Colors.grey[500] : Colors.grey[600],
+                      'PSGMX',
+                      style: GoogleFonts.poppins(
+                        fontSize: 38,
+                        fontWeight: FontWeight.w700,
+                        color: colorScheme.onSurface,
+                        letterSpacing: 3,
                       ),
                     ),
-                  );
-                },
-              ),
+                  ),
 
-              if (_showRetry) ...[
-                const SizedBox(height: 48),
-                Container(
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(16),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.orange.withValues(alpha: 50/255),
-                        blurRadius: 20,
-                        spreadRadius: 2,
-                      ),
-                    ],
-                  ),
-                  child: FilledButton.icon(
-                    onPressed: () {
-                      // Force refresh or navigation
-                      final provider = context.read<UserProvider>();
-                      if (provider.initComplete) {
-                        // If provider says complete but we are here, strict navigate
-                        if (provider.currentUser != null) {
-                          context.go('/');
-                        } else {
-                          context.go('/login');
-                        }
-                      } else {
-                        // Retry init
-                        provider.retryInit();
-                        setState(() => _showRetry = false);
-                      }
-                    },
-                    icon: const Icon(Icons.refresh_rounded, size: 22),
-                    label: const Text(
-                      "Tap to Refresh",
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                    style: FilledButton.styleFrom(
-                      backgroundColor: Colors.orange.shade600,
-                      foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 32,
-                        vertical: 16,
-                      ),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(16),
+                  const SizedBox(height: 8),
+
+                  // Tagline
+                  FadeTransition(
+                    opacity: _fadeAnimation,
+                    child: Text(
+                      'Placement Excellence',
+                      style: GoogleFonts.inter(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w500,
+                        color: colorScheme.onSurfaceVariant,
+                        letterSpacing: 1.5,
                       ),
                     ),
                   ),
-                ),
-              ]
-            ],
-          ),
+
+                  const Spacer(flex: 3),
+
+                  // Minimal Loading Indicator
+                  FadeTransition(
+                    opacity: _fadeAnimation,
+                    child: SizedBox(
+                      width: 24,
+                      height: 24,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2.5,
+                        valueColor: AlwaysStoppedAnimation<Color>(
+                          colorScheme.primary,
+                        ),
+                        backgroundColor: colorScheme.outline.withValues(alpha: 0.1),
+                      ),
+                    ),
+                  ),
+
+                  const SizedBox(height: 60),
+                ],
+              ),
+            );
+          },
         ),
       ),
     );
   }
-}
-
-/// Custom painter for rotating ring around logo
-class _CircleRingPainter extends CustomPainter {
-  final Color color;
-
-  _CircleRingPainter(this.color);
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final paint = Paint()
-      ..color = Colors.white.withValues(alpha: 50/255)
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 3;
-
-    final center = Offset(size.width / 2, size.height / 2);
-    final radius = size.width / 2 - 10;
-
-    // Draw partial arc
-    canvas.drawArc(
-      Rect.fromCircle(center: center, radius: radius),
-      0,
-      math.pi * 1.5,
-      false,
-      paint,
-    );
-  }
-
-  @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }

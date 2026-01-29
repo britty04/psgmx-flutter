@@ -261,6 +261,8 @@ class _HomeScreenState extends State<HomeScreen> {
               ],
              ),
              const Spacer(),
+             const _NotificationBell(),
+             const SizedBox(width: AppSpacing.sm),
              _RoleBadge(userProvider: userProvider),
           ],
         ),
@@ -300,6 +302,63 @@ class _HomeScreenState extends State<HomeScreen> {
     if (dob == null) return false;
     final now = DateTime.now();
     return dob.month == now.month && dob.day == now.day;
+  }
+}
+
+class _NotificationBell extends StatelessWidget {
+  const _NotificationBell();
+
+  @override
+  Widget build(BuildContext context) {
+    return Stack(
+      clipBehavior: Clip.none,
+      children: [
+        IconButton(
+          onPressed: () {
+            // TODO: Navigate to notifications screen
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('Notifications feature coming soon!')),
+            );
+          },
+          icon: Icon(
+            Icons.notifications_outlined,
+            color: Theme.of(context).colorScheme.onSurface,
+          ),
+          style: IconButton.styleFrom(
+            backgroundColor: Theme.of(context).colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
+          ),
+        ),
+        // Badge (example - connect to real notification count later)
+        Positioned(
+          right: 8,
+          top: 8,
+          child: Container(
+            padding: const EdgeInsets.all(4),
+            decoration: BoxDecoration(
+              color: Theme.of(context).colorScheme.error,
+              shape: BoxShape.circle,
+              border: Border.all(
+                color: Theme.of(context).scaffoldBackgroundColor,
+                width: 2,
+              ),
+            ),
+            constraints: const BoxConstraints(
+              minWidth: 16,
+              minHeight: 16,
+            ),
+            child: Text(
+              '3',
+              style: TextStyle(
+                color: Theme.of(context).colorScheme.onError,
+                fontSize: 10,
+                fontWeight: FontWeight.bold,
+              ),
+              textAlign: TextAlign.center,
+            ),
+          ),
+        ),
+      ],
+    );
   }
 }
 

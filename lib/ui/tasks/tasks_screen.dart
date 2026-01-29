@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'dart:io';
 import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -7,9 +8,12 @@ import 'package:excel/excel.dart' hide Border;
 import 'package:intl/intl.dart';
 import '../../providers/user_provider.dart';
 import '../../services/supabase_db_service.dart';
+import '../../services/task_upload_service.dart';
+import '../../models/daily_task.dart';
 import '../../core/theme/app_dimens.dart';
 import '../widgets/premium_card.dart';
 import '../widgets/premium_empty_state.dart';
+import 'modern_bulk_upload_dialog.dart';
 
 class TasksScreen extends StatelessWidget {
   const TasksScreen({super.key});
@@ -33,7 +37,8 @@ class TasksScreen extends StatelessWidget {
 // ==========================================
 
 class _StudentTasksView extends StatefulWidget {
-  const _StudentTasksView();
+  final bool isEmbedded;
+  const _StudentTasksView({this.isEmbedded = false});
 
   @override
   State<_StudentTasksView> createState() => _StudentTasksViewState();
@@ -50,19 +55,20 @@ class _StudentTasksViewState extends State<_StudentTasksView> {
     return Scaffold(
       body: CustomScrollView(
         slivers: [
-          SliverAppBar(
-            pinned: true,
-            floating: true,
-            title: const Text("Daily Roadmap"),
-            centerTitle: false,
-            actions: [
-              IconButton(
-                icon: const Icon(Icons.calendar_today_outlined),
-                onPressed: _pickDate,
-                tooltip: "Jump to Date",
-              )
-            ],
-          ),
+          if (!widget.isEmbedded)
+            SliverAppBar(
+              pinned: true,
+              floating: true,
+              title: const Text("Daily Roadmap"),
+              centerTitle: false,
+              actions: [
+                IconButton(
+                  icon: const Icon(Icons.calendar_today_outlined),
+                  onPressed: _pickDate,
+                  tooltip: "Jump to Date",
+                )
+              ],
+            ),
           
           // Date Navigator Sticky Header
           SliverToBoxAdapter(
@@ -72,6 +78,7 @@ class _StudentTasksViewState extends State<_StudentTasksView> {
                 date: _selectedDate,
                 onNext: () => setState(() => _selectedDate = _selectedDate.add(const Duration(days: 1))),
                 onPrev: () => setState(() => _selectedDate = _selectedDate.subtract(const Duration(days: 1))),
+                onTitleTap: widget.isEmbedded ? _pickDate : null,
               ),
             ),
           ),
@@ -154,8 +161,14 @@ class _DateNavigator extends StatelessWidget {
   final DateTime date;
   final VoidCallback onPrev;
   final VoidCallback onNext;
+  final VoidCallback? onTitleTap;
 
-  const _DateNavigator({required this.date, required this.onPrev, required this.onNext});
+  const _DateNavigator({
+    required this.date, 
+    required this.onPrev, 
+    required this.onNext,
+    this.onTitleTap,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -169,24 +182,40 @@ class _DateNavigator extends StatelessWidget {
              icon: const Icon(Icons.chevron_left),
              splashRadius: 24,
            ),
-           Column(
-             mainAxisSize: MainAxisSize.min,
-             children: [
-               Text(
-                 DateFormat('EEEE').format(date).toUpperCase(),
-                 style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                   color: Theme.of(context).colorScheme.onSurfaceVariant,
-                   letterSpacing: 1.0,
-                   fontWeight: FontWeight.bold
-                 ),
+           InkWell(
+             onTap: onTitleTap,
+             borderRadius: BorderRadius.circular(AppRadius.sm),
+             child: Padding(
+               padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 4.0),
+               child: Column(
+                 mainAxisSize: MainAxisSize.min,
+                 children: [
+                   Text(
+                     DateFormat('EEEE').format(date).toUpperCase(),
+                     style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                       color: Theme.of(context).colorScheme.onSurfaceVariant,
+                       letterSpacing: 1.0,
+                       fontWeight: FontWeight.bold
+                     ),
+                   ),
+                   Row(
+                     mainAxisSize: MainAxisSize.min,
+                     children: [
+                       Text(
+                         DateFormat('MMMM d, yyyy').format(date), 
+                         style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                           fontWeight: FontWeight.bold
+                         )
+                       ),
+                       if (onTitleTap != null) ...[
+                         const SizedBox(width: 4),
+                         Icon(Icons.arrow_drop_down, size: 16, color: Theme.of(context).colorScheme.primary),
+                       ]
+                     ],
+                   ),
+                 ],
                ),
-               Text(
-                 DateFormat('MMMM d, yyyy').format(date), 
-                 style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                   fontWeight: FontWeight.bold
-                 )
-               ),
-             ],
+             ),
            ),
            IconButton(
              onPressed: onNext, 
@@ -216,97 +245,209 @@ class _TaskPremiumCard extends StatelessWidget {
     required this.isLink
   });
 
+  Future<void> _shareLink(BuildContext context) async {
+    try {
+      // Use share_plus package or platform-specific sharing
+      // For now, copy to clipboard
+      await Clipboard.setData(ClipboardData(text: content));
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Link copied to clipboard!'),
+            duration: Duration(seconds: 2),
+          ),
+        );
+      }
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error: $e')),
+        );
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
-    return PremiumCard(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-           // Header Tag
-           Container(
-             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-             decoration: BoxDecoration(
-               color: color.withValues(alpha: 0.1),
-               borderRadius: BorderRadius.circular(AppRadius.sm),
-               border: Border.all(color: color.withValues(alpha: 0.2)),
-             ),
-             child: Row(
-               mainAxisSize: MainAxisSize.min,
-               children: [
-                 Icon(icon, size: 14, color: color),
-                 const SizedBox(width: AppSpacing.xs),
-                 Text(
-                   type.toUpperCase(), 
-                   style: TextStyle(
-                     fontSize: 10, 
-                     fontWeight: FontWeight.bold, 
-                     color: color,
-                     letterSpacing: 0.5
+    return Container(
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: [
+            color.withValues(alpha: 0.03),
+            Colors.transparent,
+          ],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(AppRadius.xl),
+        border: Border.all(
+          color: color.withValues(alpha: 0.2),
+          width: 1.5,
+        ),
+      ),
+      child: PremiumCard(
+        backgroundColor: Colors.transparent,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+             // Header Tag
+             Container(
+               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+               decoration: BoxDecoration(
+                 color: color.withValues(alpha: 0.15),
+                 borderRadius: BorderRadius.circular(AppRadius.md),
+                 boxShadow: [
+                   BoxShadow(
+                     color: color.withValues(alpha: 0.1),
+                     blurRadius: 8,
+                     offset: const Offset(0, 2),
                    )
-                 ),
-               ],
+                 ],
+               ),
+               child: Row(
+                 mainAxisSize: MainAxisSize.min,
+                 children: [
+                   Icon(icon, size: 16, color: color),
+                   const SizedBox(width: AppSpacing.xs),
+                   Text(
+                     type.toUpperCase(), 
+                     style: TextStyle(
+                       fontSize: 11, 
+                       fontWeight: FontWeight.w700, 
+                       color: color,
+                       letterSpacing: 0.8
+                     )
+                   ),
+                 ],
+               ),
              ),
-           ),
-           
-           const SizedBox(height: AppSpacing.md),
-           
-           // Title
-           Text(
-             title, 
-             style: Theme.of(context).textTheme.titleLarge?.copyWith(
-               fontWeight: FontWeight.bold,
-               color: Theme.of(context).colorScheme.onSurface,
-             )
-           ),
-           
-           const Padding(
-             padding: EdgeInsets.symmetric(vertical: AppSpacing.md),
-             child: Divider(height: 1),
-           ),
-           
-           // Content Area
-           if (isLink)
-              InkWell(
-                onTap: () => launchUrl(Uri.parse(content)),
-                borderRadius: BorderRadius.circular(AppRadius.sm),
-                child: Container(
-                  padding: const EdgeInsets.all(AppSpacing.md),
-                  decoration: BoxDecoration(
-                    color: Theme.of(context).colorScheme.surfaceContainer,
-                    borderRadius: BorderRadius.circular(AppRadius.sm),
-                    border: Border.all(color: Theme.of(context).colorScheme.outline.withValues(alpha: 0.3)),
-                  ),
-                  child: Row(
-                    children: [
-                      Icon(Icons.link, color: Theme.of(context).colorScheme.primary),
-                      const SizedBox(width: AppSpacing.md),
-                      Expanded(
-                        child: Text(
-                          content, 
-                          style: TextStyle(
-                            color: Theme.of(context).colorScheme.primary, 
-                            fontWeight: FontWeight.w500,
-                            decoration: TextDecoration.underline,
-                            decorationColor: Theme.of(context).colorScheme.primary.withValues(alpha: 0.3),
+             
+             const SizedBox(height: AppSpacing.lg),
+             
+             // Title
+             Text(
+               title, 
+               style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                 fontWeight: FontWeight.w700,
+                 color: Theme.of(context).colorScheme.onSurface,
+                 letterSpacing: -0.5,
+               )
+             ),
+             
+             const SizedBox(height: AppSpacing.md),
+             Divider(color: color.withValues(alpha: 0.2), thickness: 1.5),
+             const SizedBox(height: AppSpacing.md),
+             
+             // Content Area
+             if (isLink)
+                Column(
+                  children: [
+                    InkWell(
+                      onTap: () async {
+                        final uri = Uri.parse(content);
+                        if (await canLaunchUrl(uri)) {
+                          await launchUrl(uri, mode: LaunchMode.externalApplication);
+                        }
+                      },
+                      borderRadius: BorderRadius.circular(AppRadius.md),
+                      child: Container(
+                        padding: const EdgeInsets.all(AppSpacing.lg),
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            colors: [
+                              Theme.of(context).colorScheme.primaryContainer.withValues(alpha: 0.3),
+                              Theme.of(context).colorScheme.primaryContainer.withValues(alpha: 0.1),
+                            ],
                           ),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
+                          borderRadius: BorderRadius.circular(AppRadius.md),
+                          border: Border.all(
+                            color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.3),
+                          ),
+                        ),
+                        child: Row(
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.all(8),
+                              decoration: BoxDecoration(
+                                color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.1),
+                                shape: BoxShape.circle,
+                              ),
+                              child: Icon(
+                                Icons.link_rounded,
+                                color: Theme.of(context).colorScheme.primary,
+                                size: 20,
+                              ),
+                            ),
+                            const SizedBox(width: AppSpacing.md),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    'Open Challenge',
+                                    style: TextStyle(
+                                      color: Theme.of(context).colorScheme.primary,
+                                      fontWeight: FontWeight.w600,
+                                      fontSize: 13,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 2),
+                                  Text(
+                                    content, 
+                                    style: TextStyle(
+                                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                                      fontSize: 11,
+                                    ),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ],
+                              ),
+                            ),
+                            Icon(
+                              Icons.open_in_new_rounded,
+                              size: 18,
+                              color: Theme.of(context).colorScheme.primary,
+                            ),
+                          ],
                         ),
                       ),
-                      const Icon(Icons.open_in_new, size: 16, color: Colors.grey),
-                    ],
+                    ),
+                    const SizedBox(height: AppSpacing.sm),
+                    // Share Button
+                    SizedBox(
+                      width: double.infinity,
+                      child: OutlinedButton.icon(
+                        onPressed: () => _shareLink(context),
+                        icon: const Icon(Icons.share_rounded, size: 18),
+                        label: const Text('Share Link'),
+                        style: OutlinedButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                          side: BorderSide(color: color.withValues(alpha: 0.3)),
+                          foregroundColor: color,
+                        ),
+                      ),
+                    ),
+                  ],
+                )
+             else
+                Container(
+                  padding: const EdgeInsets.all(AppSpacing.lg),
+                  decoration: BoxDecoration(
+                    color: Theme.of(context).colorScheme.surfaceContainerLow,
+                    borderRadius: BorderRadius.circular(AppRadius.md),
+                  ),
+                  child: Text(
+                    content, 
+                    style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                      height: 1.7,
+                      color: Theme.of(context).colorScheme.onSurface,
+                      fontSize: 15,
+                    )
                   ),
                 ),
-              )
-           else
-              Text(
-                content, 
-                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                  height: 1.6,
-                  color: Theme.of(context).colorScheme.onSurfaceVariant
-                )
-              ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -322,24 +463,60 @@ class _RepTasksView extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return DefaultTabController(
-      length: 2, 
+      length: 3, 
       child: Scaffold(
         body: NestedScrollView(
           headerSliverBuilder: (context, innerBoxIsScrolled) => [
-            const SliverAppBar(
-              title: Text("Manage Tasks"),
+            SliverAppBar(
+              title: const Text("Manage Tasks"),
               pinned: true,
               floating: true,
-              bottom: TabBar(
-                tabs: [
-                  Tab(text: "New Entry"),
-                  Tab(text: "Bulk Upload"),
-                ],
+              centerTitle: false,
+              bottom: PreferredSize(
+                preferredSize: const Size.fromHeight(56),
+                child: Container(
+                  decoration: BoxDecoration(
+                    border: Border(
+                      bottom: BorderSide(
+                        color: Theme.of(context).dividerColor.withValues(alpha: 0.1),
+                      ),
+                    ),
+                  ),
+                  child: TabBar(
+                    isScrollable: false,
+                    tabAlignment: TabAlignment.fill,
+                    indicatorSize: TabBarIndicatorSize.tab,
+                    indicator: BoxDecoration(
+                      border: Border(
+                        bottom: BorderSide(
+                          color: Theme.of(context).colorScheme.primary,
+                          width: 3,
+                        ),
+                      ),
+                    ),
+                    labelStyle: const TextStyle(
+                      fontWeight: FontWeight.w600,
+                      fontSize: 14,
+                      letterSpacing: 0.5,
+                    ),
+                    unselectedLabelStyle: const TextStyle(
+                      fontWeight: FontWeight.w500,
+                      fontSize: 14,
+                    ),
+                    tabs: const [
+                      Tab(text: "TASKS"),
+                      Tab(text: "NEW ENTRY"),
+                      Tab(text: "BULK UPLOAD"),
+                    ],
+                  ),
+                ),
               ),
             ),
           ],
           body: const TabBarView(
+            physics: NeverScrollableScrollPhysics(),
             children: [
+               _RepTaskManagementView(),
                _SingleEntryForm(),
                _BulkUploadForm(),
             ],
@@ -347,6 +524,523 @@ class _RepTasksView extends StatelessWidget {
         ),
       )
     );
+  }
+}
+
+// ==========================================
+// REP TASK MANAGEMENT VIEW
+// ==========================================
+
+class _RepTaskManagementView extends StatefulWidget {
+  const _RepTaskManagementView();
+
+  @override
+  State<_RepTaskManagementView> createState() => _RepTaskManagementViewState();
+}
+
+class _RepTaskManagementViewState extends State<_RepTaskManagementView> {
+  DateTime _startDate = DateTime.now().subtract(const Duration(days: 7));
+  DateTime _endDate = DateTime.now().add(const Duration(days: 30));
+
+  @override
+  Widget build(BuildContext context) {
+    final userProvider = Provider.of<UserProvider>(context, listen: false);
+    final taskUploadService = TaskUploadService();
+
+    return Column(
+      children: [
+        // Date Range Selector
+        Container(
+          padding: const EdgeInsets.all(AppSpacing.screenPadding),
+          decoration: BoxDecoration(
+            color: Theme.of(context).colorScheme.surfaceContainerHighest,
+            border: Border(
+              bottom: BorderSide(
+                color: Theme.of(context).dividerColor.withValues(alpha: 0.1),
+              ),
+            ),
+          ),
+          child: Row(
+            children: [
+              Expanded(
+                child: Text(
+                  '${DateFormat('MMM d').format(_startDate)} - ${DateFormat('MMM d, yyyy').format(_endDate)}',
+                  style: Theme.of(context).textTheme.titleSmall,
+                ),
+              ),
+              OutlinedButton.icon(
+                onPressed: _selectDateRange,
+                icon: const Icon(Icons.date_range, size: 16),
+                label: const Text('Change'),
+                style: OutlinedButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                ),
+              ),
+            ],
+          ),
+        ),
+
+        // Tasks List
+        Expanded(
+          child: FutureBuilder<List<DailyTask>>(
+            future: taskUploadService.getTasksInRange(
+              startDate: _startDate,
+              endDate: _endDate,
+            ),
+            builder: (context, snapshot) {
+              if (snapshot.connectionState == ConnectionState.waiting) {
+                return const Center(child: CircularProgressIndicator());
+              }
+
+              if (snapshot.hasError) {
+                return Center(
+                  child: Text('Error: ${snapshot.error}'),
+                );
+              }
+
+              final tasks = snapshot.data ?? [];
+
+              if (tasks.isEmpty) {
+                return PremiumEmptyState(
+                  icon: Icons.task_outlined,
+                  message: 'No Tasks Found',
+                  subMessage: 'No tasks in selected date range',
+                );
+              }
+
+              // Group tasks by date
+              final groupedTasks = <String, List<DailyTask>>{};
+              for (final task in tasks) {
+                final dateKey = DateFormat('yyyy-MM-dd').format(task.date);
+                groupedTasks.putIfAbsent(dateKey, () => []);
+                groupedTasks[dateKey]!.add(task);
+              }
+
+              final sortedDates = groupedTasks.keys.toList()
+                ..sort((a, b) => b.compareTo(a)); // Newest first
+
+              return ListView.builder(
+                padding: const EdgeInsets.all(AppSpacing.screenPadding),
+                itemCount: sortedDates.length,
+                itemBuilder: (context, index) {
+                  final dateKey = sortedDates[index];
+                  final dateTasks = groupedTasks[dateKey]!;
+                  final date = DateTime.parse(dateKey);
+
+                  return Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // Date Header
+                      Padding(
+                        padding: const EdgeInsets.only(bottom: 8, top: index == 0 ? 0 : 16),
+                        child: Text(
+                          DateFormat('EEEE, MMMM d, yyyy').format(date),
+                          style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+
+                      // Task Cards for this date
+                      ...dateTasks.map((task) => _TaskManagementCard(
+                        task: task,
+                        onDelete: () => _deleteTask(task, taskUploadService),
+                        onEdit: () => _editTask(task),
+                      )),
+                    ],
+                  );
+                },
+              );
+            },
+          ),
+        ),
+      ],
+    );
+  }
+
+  Future<void> _selectDateRange() async {
+    final picked = await showDateRangePicker(
+      context: context,
+      firstDate: DateTime(2025, 1, 1),
+      lastDate: DateTime(2027, 12, 31),
+      initialDateRange: DateTimeRange(start: _startDate, end: _endDate),
+    );
+
+    if (picked != null) {
+      setState(() {
+        _startDate = picked.start;
+        _endDate = picked.end;
+      });
+    }
+  }
+
+  Future<void> _deleteTask(DailyTask task, TaskUploadService service) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Delete Task'),
+        content: Text('Are you sure you want to delete "${task.title}"?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            style: FilledButton.styleFrom(
+              backgroundColor: Theme.of(context).colorScheme.error,
+            ),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true && mounted) {
+      try {
+        await service.deleteTask(task.id);
+        setState(() {}); // Refresh the list
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Task deleted successfully')),
+          );
+        }
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Failed to delete task: $e')),
+          );
+        }
+      }
+    }
+  }
+
+  void _editTask(DailyTask task) {
+    showDialog(
+      context: context,
+      builder: (ctx) => _EditTaskDialog(task: task),
+    ).then((edited) {
+      if (edited == true) {
+        setState(() {}); // Refresh the list
+      }
+    });
+  }
+}
+
+class _TaskManagementCard extends StatelessWidget {
+  final DailyTask task;
+  final VoidCallback onDelete;
+  final VoidCallback onEdit;
+
+  const _TaskManagementCard({
+    required this.task,
+    required this.onDelete,
+    required this.onEdit,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final isLeetCode = task.topicType == TopicType.leetcode;
+    final color = isLeetCode ? Colors.orange : colorScheme.primary;
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: [
+            color.withValues(alpha: 0.03),
+            Colors.transparent,
+          ],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(AppRadius.lg),
+        border: Border.all(
+          color: color.withValues(alpha: 0.2),
+          width: 1.5,
+        ),
+      ),
+      child: PremiumCard(
+        backgroundColor: Colors.transparent,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Header with type and actions
+            Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: color.withValues(alpha: 0.15),
+                    borderRadius: BorderRadius.circular(AppRadius.sm),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        isLeetCode ? Icons.code : Icons.menu_book_outlined,
+                        size: 14,
+                        color: color,
+                      ),
+                      const SizedBox(width: 6),
+                      Text(
+                        task.topicType.displayName.toUpperCase(),
+                        style: TextStyle(
+                          fontSize: 10,
+                          fontWeight: FontWeight.w700,
+                          color: color,
+                          letterSpacing: 0.8,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const Spacer(),
+                IconButton(
+                  onPressed: onEdit,
+                  icon: const Icon(Icons.edit_outlined, size: 18),
+                  tooltip: 'Edit Task',
+                  style: IconButton.styleFrom(
+                    padding: const EdgeInsets.all(8),
+                  ),
+                ),
+                IconButton(
+                  onPressed: onDelete,
+                  icon: const Icon(Icons.delete_outline, size: 18),
+                  tooltip: 'Delete Task',
+                  style: IconButton.styleFrom(
+                    padding: const EdgeInsets.all(8),
+                    foregroundColor: colorScheme.error,
+                  ),
+                ),
+              ],
+            ),
+
+            const SizedBox(height: 12),
+
+            // Title
+            Text(
+              task.title,
+              style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+
+            // Subject (for core tasks)
+            if (task.subject != null && task.subject!.isNotEmpty) ...[
+              const SizedBox(height: 8),
+              Text(
+                task.subject!,
+                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                  color: colorScheme.onSurfaceVariant,
+                ),
+              ),
+            ],
+
+            // Reference Link (for leetcode tasks)
+            if (task.referenceLink != null && task.referenceLink!.isNotEmpty) ...[
+              const SizedBox(height: 8),
+              InkWell(
+                onTap: () async {
+                  final uri = Uri.parse(task.referenceLink!);
+                  if (await canLaunchUrl(uri)) {
+                    await launchUrl(uri, mode: LaunchMode.externalApplication);
+                  }
+                },
+                child: Row(
+                  children: [
+                    Icon(Icons.link, size: 16, color: colorScheme.primary),
+                    const SizedBox(width: 4),
+                    Expanded(
+                      child: Text(
+                        task.referenceLink!,
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: colorScheme.primary,
+                          decoration: TextDecoration.underline,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _EditTaskDialog extends StatefulWidget {
+  final DailyTask task;
+
+  const _EditTaskDialog({required this.task});
+
+  @override
+  State<_EditTaskDialog> createState() => _EditTaskDialogState();
+}
+
+class _EditTaskDialogState extends State<_EditTaskDialog> {
+  late final TextEditingController _titleCtrl;
+  late final TextEditingController _linkCtrl;
+  late final TextEditingController _subjectCtrl;
+  late DateTime _date;
+  bool _isLoading = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _titleCtrl = TextEditingController(text: widget.task.title);
+    _linkCtrl = TextEditingController(text: widget.task.referenceLink ?? '');
+    _subjectCtrl = TextEditingController(text: widget.task.subject ?? '');
+    _date = widget.task.date;
+  }
+
+  @override
+  void dispose() {
+    _titleCtrl.dispose();
+    _linkCtrl.dispose();
+    _subjectCtrl.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final userProvider = Provider.of<UserProvider>(context, listen: false);
+    final isLeetCode = widget.task.topicType == TopicType.leetcode;
+
+    return AlertDialog(
+      title: Text('Edit ${widget.task.topicType.displayName} Task'),
+      content: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Date Picker
+            InkWell(
+              onTap: () async {
+                final picked = await showDatePicker(
+                  context: context,
+                  initialDate: _date,
+                  firstDate: DateTime(2025),
+                  lastDate: DateTime(2027),
+                );
+                if (picked != null) {
+                  setState(() => _date = picked);
+                }
+              },
+              child: Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  border: Border.all(color: Theme.of(context).colorScheme.outline),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(Icons.calendar_today, size: 16),
+                    const SizedBox(width: 8),
+                    Text(DateFormat('yyyy-MM-dd').format(_date)),
+                  ],
+                ),
+              ),
+            ),
+
+            const SizedBox(height: 16),
+
+            // Title
+            TextField(
+              controller: _titleCtrl,
+              decoration: InputDecoration(
+                labelText: isLeetCode ? 'Problem Title' : 'Topic',
+                border: const OutlineInputBorder(),
+              ),
+            ),
+
+            const SizedBox(height: 16),
+
+            // Link or Subject
+            if (isLeetCode)
+              TextField(
+                controller: _linkCtrl,
+                decoration: const InputDecoration(
+                  labelText: 'LeetCode URL',
+                  border: OutlineInputBorder(),
+                ),
+                keyboardType: TextInputType.url,
+              )
+            else
+              TextField(
+                controller: _subjectCtrl,
+                decoration: const InputDecoration(
+                  labelText: 'Subject / Description',
+                  border: OutlineInputBorder(),
+                ),
+                maxLines: 3,
+              ),
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: _isLoading ? null : () => Navigator.pop(context),
+          child: const Text('Cancel'),
+        ),
+        FilledButton(
+          onPressed: _isLoading ? null : () => _saveTask(userProvider.user!.uid),
+          child: _isLoading
+              ? const SizedBox(
+                  width: 16,
+                  height: 16,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                )
+              : const Text('Save'),
+        ),
+      ],
+    );
+  }
+
+  Future<void> _saveTask(String userId) async {
+    if (_titleCtrl.text.trim().isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Title is required')),
+      );
+      return;
+    }
+
+    setState(() => _isLoading = true);
+
+    try {
+      final taskUploadService = TaskUploadService();
+      await taskUploadService.createTask(
+        date: _date,
+        topicType: widget.task.topicType,
+        title: _titleCtrl.text.trim(),
+        referenceLink: _linkCtrl.text.trim().isNotEmpty ? _linkCtrl.text.trim() : null,
+        subject: _subjectCtrl.text.trim().isNotEmpty ? _subjectCtrl.text.trim() : null,
+        uploadedBy: userId,
+      );
+
+      if (mounted) {
+        Navigator.pop(context, true);
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Task updated successfully')),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to update task: $e')),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
+    }
   }
 }
 
@@ -512,313 +1206,72 @@ class _FormSectionHeader extends StatelessWidget {
   }
 }
 
-class _BulkUploadForm extends StatefulWidget {
+class _BulkUploadForm extends StatelessWidget {
   const _BulkUploadForm();
 
   @override
-  State<_BulkUploadForm> createState() => _BulkUploadFormState();
-}
-
-class _BulkUploadFormState extends State<_BulkUploadForm> {
-  bool _isLoading = false;
-  String? _statusMessage;
-  bool _isError = false;
-  String _uploadType = 'mixed'; // 'leetcode', 'core', 'mixed'
-
-  Future<void> _downloadTemplate() async {
-     try {
-       // Create Excel
-       final excel = Excel.createExcel();
-       // Remove default sheet if possible or just use it
-       
-       final sheet = excel['Sheet1'];
-       
-       List<String> headers = [];
-       List<String> sampleRow = [];
-       
-       String tomorrow = DateFormat('yyyy-MM-dd').format(DateTime.now().add(const Duration(days: 1)));
-
-       if (_uploadType == 'leetcode') {
-          headers = ['Date', 'LeetCode URL'];
-          sampleRow = [tomorrow, 'https://leetcode.com/problems/two-sum'];
-       } else if (_uploadType == 'core') {
-          headers = ['Date', 'CS Topic', 'Description'];
-          sampleRow = [tomorrow, 'Arrays', 'Learn array traversal'];
-       } else {
-          headers = ['Date', 'LeetCode URL', 'CS Topic', 'Description'];
-          sampleRow = [tomorrow, 'https://leetcode.com/problems/two-sum', 'Arrays', 'Learn array traversal'];
-       }
-
-       // Clear existing rows (Sheet1 usually comes with empty rows or just fresh)
-       // excel package sheet logic varies, but appendRow is safe.
-       
-       sheet.appendRow(headers.map((e) => TextCellValue(e)).toList());
-       sheet.appendRow(sampleRow.map((e) => TextCellValue(e)).toList());
-
-       // Save
-       final fileBytes = excel.save();
-       if (fileBytes == null) throw Exception("Failed to generate Excel file");
-
-       final String fileName = 'bulk_upload_template_$_uploadType.xlsx';
-       
-       final String? outputFile = await FilePicker.platform.saveFile(
-         dialogTitle: 'Save Template',
-         fileName: fileName,
-         type: FileType.custom,
-         allowedExtensions: ['xlsx'],
-       );
-
-       if (outputFile != null) {
-          final file = File(outputFile);
-          await file.writeAsBytes(fileBytes);
-          if (mounted) {
-             ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Template saved to $outputFile')));
-          }
-       }
-
-     } catch (e) {
-        if (mounted) setState(() { _statusMessage = "Template Error: $e"; _isError = true; });
-     }
-  }
-
-  Future<void> _pickAndUpload() async {
-     setState(() { _isLoading = true; _statusMessage = null; });
-     try {
-       final result = await FilePicker.platform.pickFiles(
-         type: FileType.custom,
-         allowedExtensions: ['xlsx', 'xls'],
-         withData: true,
-       );
-       
-       if (result == null) {
-          setState(() { _isLoading = false; });
-          return;
-       }
-
-       final bytes = result.files.first.bytes;
-       if (bytes == null) throw Exception("Could not read file data.");
-
-       final excel = Excel.decodeBytes(bytes);
-       final tasks = <CompositeTask>[];
-
-       for (var table in excel.tables.keys) {
-          final sheet = excel.tables[table];
-          if (sheet == null) continue;
-          
-          for (int i = 1; i < sheet.maxRows; i++) {
-             final row = sheet.row(i);
-             if (row.isEmpty) continue;
-             
-             // Check if row has any data
-             bool hasData = false;
-             for (var cell in row) {
-               if (cell?.value != null) hasData = true;
-             }
-             if (!hasData) continue;
-             
-             try {
-                final dateValRaw = row[0]?.value;
-                if (dateValRaw == null) continue;
-                
-                String dateStr;
-                if (dateValRaw is DateCellValue) {
-                   dateStr = DateFormat('yyyy-MM-dd').format(dateValRaw.asDateTimeLocal());
-                } else if (dateValRaw is TextCellValue) {
-                   dateStr = dateValRaw.value.toString().split('T')[0];
-                } else {
-                   dateStr = dateValRaw.toString().split('T')[0];
-                }
-
-                String leet = "";
-                String topic = "";
-                String desc = "";
-
-                if (_uploadType == 'leetcode') {
-                    // Col 1: URL
-                    if (row.length > 1) {
-                        final val = row[1]?.value;
-                        leet = val?.toString() ?? ""; 
-                        if (val is TextCellValue) leet = val.value.toString();
-                    }
-                } else if (_uploadType == 'core') {
-                    // Col 1: Topic, Col 2: Desc
-                   if (row.length > 1) {
-                      final val = row[1]?.value;
-                      topic = val?.toString() ?? "";
-                      if (val is TextCellValue) topic = val.value.toString();
-                   }
-                   if (row.length > 2) {
-                      final val = row[2]?.value;
-                      desc = val?.toString() ?? "";
-                      if (val is TextCellValue) desc = val.value.toString();
-                   }
-                } else {
-                   // Mixed
-                   if (row.length > 1) {
-                      final val = row[1]?.value;
-                      leet = val?.toString() ?? "";
-                      if (val is TextCellValue) leet = val.value.toString();
-                   }
-                   if (row.length > 2) {
-                       final val = row[2]?.value;
-                       topic = val?.toString() ?? "";
-                       if (val is TextCellValue) topic = val.value.toString();
-                   }
-                   if (row.length > 3) {
-                       final val = row[3]?.value;
-                       desc = val?.toString() ?? "";
-                       if (val is TextCellValue) desc = val.value.toString();
-                   }
-                }
-
-                tasks.add(CompositeTask(
-                  date: dateStr, 
-                  leetcodeUrl: leet, 
-                  csTopic: topic, 
-                  csTopicDescription: desc, 
-                  motivationQuote: ''
-                ));
-             } catch (e) {
-                // Ignore malformed rows
-             }
-          }
-       }
-
-       if (tasks.isEmpty) throw Exception("No valid rows found for type '$_uploadType'.");
-       
-        final taskMap = <String, CompositeTask>{};
-        for (final task in tasks) {
-          taskMap[task.date] = task; 
-        }
-        final deduplicatedTasks = taskMap.values.toList();
-        
-       if (!mounted) return;
-       final dbService = Provider.of<SupabaseDbService>(context, listen: false);
-       await dbService.bulkPublishTasks(deduplicatedTasks);
-       
-       if (mounted) {
-          setState(() { 
-            _statusMessage = "Success! ${deduplicatedTasks.length} unique tasks scheduled."; 
-            _isError = false; 
-          });
-       }
-
-     } catch (e) {
-       if (mounted) {
-         setState(() { _statusMessage = "Upload Failed: $e"; _isError = true; });
-       }
-     } finally {
-       if (mounted) {
-         setState(() => _isLoading = false);
-       }
-     }
-  }
-
-  @override
   Widget build(BuildContext context) {
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(AppSpacing.xxl),
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          PremiumCard(
-            padding: const EdgeInsets.all(AppSpacing.xl),
-            child: Column(
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(AppSpacing.xl),
-                  decoration: BoxDecoration(
-                    color: Theme.of(context).colorScheme.primaryContainer.withValues(alpha: 0.3),
-                    shape: BoxShape.circle,
-                  ),
-                  child: Icon(Icons.upload_file, size: 48, color: Theme.of(context).colorScheme.primary),
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(AppSpacing.xxl),
+        child: PremiumCard(
+          padding: const EdgeInsets.all(AppSpacing.xl),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                padding: const EdgeInsets.all(AppSpacing.xl),
+                decoration: BoxDecoration(
+                  color: Theme.of(context).colorScheme.primaryContainer.withValues(alpha: 0.3),
+                  shape: BoxShape.circle,
                 ),
-                const SizedBox(height: AppSpacing.lg),
-                Text("Bulk Task Upload", style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold)),
-                const SizedBox(height: AppSpacing.md),
-                
-                // Upload Type Selector
-                DropdownButtonFormField<String>(
-                  key: ValueKey(_uploadType),
-                  initialValue: _uploadType,
-                  decoration: const InputDecoration(
-                    labelText: "Upload Type",
-                    border: OutlineInputBorder(),
-                    contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                  ),
-                  items: const [
-                    DropdownMenuItem(value: 'mixed', child: Text("Mixed (LeetCode + Core)")),
-                    DropdownMenuItem(value: 'leetcode', child: Text("LeetCode Only")),
-                    DropdownMenuItem(value: 'core', child: Text("Core CS Topic Only")),
-                  ], 
-                  onChanged: (val) {
-                    if (val != null) setState(() => _uploadType = val);
+                child: Icon(
+                  Icons.upload_file,
+                  size: 64,
+                  color: Theme.of(context).colorScheme.primary,
+                ),
+              ),
+              const SizedBox(height: AppSpacing.lg),
+              Text(
+                "Bulk Task Upload",
+                style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              const SizedBox(height: AppSpacing.md),
+              Text(
+                "Upload multiple tasks at once using Excel file",
+                textAlign: TextAlign.center,
+                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                ),
+              ),
+              const SizedBox(height: AppSpacing.xl),
+              FilledButton.icon(
+                onPressed: () async {
+                  final result = await showDialog<bool>(
+                    context: context,
+                    builder: (ctx) => const ModernBulkUploadDialog(),
+                  );
+                  
+                  if (result == true && context.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('Tasks uploaded successfully')),
+                    );
                   }
-                ),
-                const SizedBox(height: AppSpacing.md),
-
-                Text(
-                  _uploadType == 'mixed' 
-                     ? "Format: Date | LeetCode URL | Topic | Description"
-                     : _uploadType == 'leetcode'
-                       ? "Format: Date | LeetCode URL"
-                       : "Format: Date | Topic | Description",
-                  textAlign: TextAlign.center,
-                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: Theme.of(context).colorScheme.onSurfaceVariant),
-                ),
-                const SizedBox(height: AppSpacing.sm),
-                
-                TextButton.icon(
-                  onPressed: _downloadTemplate,
-                  icon: const Icon(Icons.download),
-                  label: const Text("Download Template"),
-                ),
-
-                const SizedBox(height: AppSpacing.xl),
-                
-                if (_isLoading)
-                  const CircularProgressIndicator()
-                else
-                  FilledButton.icon(
-                    onPressed: _pickAndUpload, 
-                    icon: const Icon(Icons.folder_open), 
-                    label: const Text("Select Excel File"),
-                    style: FilledButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(horizontal: AppSpacing.xl, vertical: AppSpacing.md)
-                    ),
+                },
+                icon: const Icon(Icons.file_upload_outlined),
+                label: const Text("Start Bulk Upload"),
+                style: FilledButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: AppSpacing.xxl,
+                    vertical: AppSpacing.md,
                   ),
-              ],
-            ),
+                ),
+              ),
+            ],
           ),
-          
-          if (_statusMessage != null) ...[
-             const SizedBox(height: AppSpacing.lg),
-             AnimatedOpacity(
-               opacity: 1.0,
-               duration: AppDurations.slow,
-               child: Container(
-                 padding: const EdgeInsets.all(AppSpacing.md),
-                 decoration: BoxDecoration(
-                   color: _isError ? Colors.red.shade50 : Colors.green.shade50,
-                   borderRadius: BorderRadius.circular(AppRadius.md),
-                   border: Border.all(color: _isError ? Colors.red.shade200 : Colors.green.shade200),
-                 ),
-                 child: Row(
-                   children: [
-                     Icon(_isError ? Icons.error_outline : Icons.check_circle_outline, color: _isError ? Colors.red : Colors.green),
-                     const SizedBox(width: AppSpacing.md),
-                     Expanded(
-                       child: Text(
-                         _statusMessage!, 
-                         style: TextStyle(color: _isError ? Colors.red.shade900 : Colors.green.shade900, fontWeight: FontWeight.w500),
-                       ),
-                     ),
-                   ],
-                 ),
-               ),
-             )
-          ]
-        ],
+        ),
       ),
     );
   }

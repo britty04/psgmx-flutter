@@ -43,6 +43,10 @@ class _StudentAttendanceView extends StatelessWidget {
             title: Text("My Attendance"),
             floating: true,
             pinned: true,
+            centerTitle: false,
+            actions: [
+              _NotificationBellIcon(),
+            ],
           ),
           
           StreamBuilder<List<AttendanceRecord>>(
@@ -210,6 +214,7 @@ class _TeamAttendanceViewState extends State<_TeamAttendanceView> {
             title: const Text("Mark Attendance"),
             pinned: true,
             floating: true,
+            centerTitle: false,
             actions: [
               TextButton(
                  onPressed: _isLoading ? null : () => _submit(db, teamId, user!.uid),
@@ -470,6 +475,45 @@ class _StatusChip extends StatelessWidget {
           fontWeight: FontWeight.bold,
           color: isPresent ? Colors.green.shade700 : Colors.red.shade700
         ),
+      ),
+    );
+  }
+}
+
+class _NotificationBellIcon extends StatelessWidget {
+  const _NotificationBellIcon();
+
+  @override
+  Widget build(BuildContext context) {
+    return IconButton(
+      onPressed: () {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Notifications coming soon!')),
+        );
+      },
+      icon: Stack(
+        clipBehavior: Clip.none,
+        children: [
+          Icon(
+            Icons.notifications_outlined,
+            color: Theme.of(context).colorScheme.onSurface,
+          ),
+          Positioned(
+            right: 0,
+            top: 0,
+            child: Container(
+              padding: const EdgeInsets.all(2),
+              decoration: BoxDecoration(
+                color: Theme.of(context).colorScheme.error,
+                shape: BoxShape.circle,
+              ),
+              constraints: const BoxConstraints(
+                minWidth: 8,
+                minHeight: 8,
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
