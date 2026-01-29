@@ -16,10 +16,13 @@ class ReportsScreen extends StatelessWidget {
     return Scaffold(
       body: CustomScrollView(
         slivers: [
-          const SliverAppBar(
-            title: Text("Analytics & Reports"),
+          SliverAppBar(
+            title: const Text("Analytics & Reports"),
             pinned: true,
             floating: true,
+            actions: const [
+              _NotificationBellIcon(),
+            ],
           ),
           
           SliverPadding(
@@ -256,6 +259,45 @@ class _ActionListTile extends StatelessWidget {
       subtitle: Text(subtitle, style: const TextStyle(fontSize: 12)),
       trailing: Icon(Icons.download, size: 20, color: Theme.of(context).colorScheme.outline),
       onTap: onTap,
+    );
+  }
+}
+
+class _NotificationBellIcon extends StatelessWidget {
+  const _NotificationBellIcon();
+
+  @override
+  Widget build(BuildContext context) {
+    return IconButton(
+      onPressed: () {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Notifications coming soon!')),
+        );
+      },
+      icon: Stack(
+        clipBehavior: Clip.none,
+        children: [
+          Icon(
+            Icons.notifications_outlined,
+            color: Theme.of(context).colorScheme.onSurface,
+          ),
+          Positioned(
+            right: 0,
+            top: 0,
+            child: Container(
+              padding: const EdgeInsets.all(2),
+              decoration: BoxDecoration(
+                color: Theme.of(context).colorScheme.error,
+                shape: BoxShape.circle,
+              ),
+              constraints: const BoxConstraints(
+                minWidth: 8,
+                minHeight: 8,
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

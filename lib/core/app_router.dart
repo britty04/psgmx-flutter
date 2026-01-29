@@ -1,11 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import '../providers/user_provider.dart';
-import '../ui/auth/login_screen.dart';
-import '../ui/auth/verify_otp_screen.dart';
-import '../ui/auth/forgot_password_screen.dart';
+import '../ui/auth/auth_screen.dart';
 import '../ui/root_layout.dart';
 import '../ui/splash_screen.dart';
+import '../ui/notifications/notifications_screen.dart';
 
 final GlobalKey<NavigatorState> _rootNavigatorKey = GlobalKey<NavigatorState>();
 
@@ -23,25 +22,15 @@ class AppRouter {
         ),
         GoRoute(
           path: '/login',
-          builder: (context, state) => const LoginScreen(),
-        ),
-        GoRoute(
-          path: '/verify_otp',
-          builder: (context, state) {
-            final email = state.extra as String?;
-            if (email == null) {
-              return const LoginScreen(); // Fallback if no email
-            }
-            return VerifyOtpScreen(email: email);
-          },
-        ),
-        GoRoute(
-          path: '/auth/forgot-password',
-          builder: (context, state) => const ForgotPasswordScreen(),
+          builder: (context, state) => const AuthScreen(),
         ),
         GoRoute(
           path: '/',
           builder: (context, state) => const RootLayout(),
+        ),
+        GoRoute(
+          path: '/notifications',
+          builder: (context, state) => const NotificationsScreen(),
         ),
       ],
       redirect: (context, state) {
@@ -59,25 +48,22 @@ class AppRouter {
         // 2. After initialization is complete, route based on auth state
         final isAuthenticated = userProvider.currentUser != null;
 
-        // Define auth screens (unauthenticated-only routes)
-        final authPaths = {
-          '/login',
-          '/verify_otp',
-          '/auth/forgot-password'
-        };
+        // If at splash and init is complete, redirect based on auth
+        if (currentPath == '/splash') {
+          return isAuthenticated ? '/' : '/login';
+        }
 
-        final isAuthPath = authPaths.contains(currentPath) || 
-                          currentPath.startsWith('/verify_otp') ||
-                          currentPath.startsWith('/auth/');
+        // Define auth screens (unauthenticated-only routes)
+        const loginPath = '/login';
 
         if (isAuthenticated) {
           // If user is logged in but tries to access login/auth screens, redirect to home
-          if (isAuthPath) {
+          if (currentPath == loginPath) {
             return '/';
           }
         } else {
           // If user is NOT logged in and tries to access protected screens, redirect to login
-          if (!isAuthPath && currentPath != '/splash') {
+          if (currentPath != loginPath) {
             return '/login';
           }
         }

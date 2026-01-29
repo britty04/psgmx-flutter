@@ -2,6 +2,117 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'app_dimens.dart';
 
+/// Custom theme extension for semantic colors
+class SemanticColors extends ThemeExtension<SemanticColors> {
+  final Color success;
+  final Color successContainer;
+  final Color onSuccess;
+  final Color warning;
+  final Color warningContainer;
+  final Color onWarning;
+  final Color info;
+  final Color infoContainer;
+  final Color onInfo;
+  final Color gold;
+  final Color silver;
+  final Color bronze;
+
+  const SemanticColors({
+    required this.success,
+    required this.successContainer,
+    required this.onSuccess,
+    required this.warning,
+    required this.warningContainer,
+    required this.onWarning,
+    required this.info,
+    required this.infoContainer,
+    required this.onInfo,
+    required this.gold,
+    required this.silver,
+    required this.bronze,
+  });
+
+  @override
+  SemanticColors copyWith({
+    Color? success,
+    Color? successContainer,
+    Color? onSuccess,
+    Color? warning,
+    Color? warningContainer,
+    Color? onWarning,
+    Color? info,
+    Color? infoContainer,
+    Color? onInfo,
+    Color? gold,
+    Color? silver,
+    Color? bronze,
+  }) {
+    return SemanticColors(
+      success: success ?? this.success,
+      successContainer: successContainer ?? this.successContainer,
+      onSuccess: onSuccess ?? this.onSuccess,
+      warning: warning ?? this.warning,
+      warningContainer: warningContainer ?? this.warningContainer,
+      onWarning: onWarning ?? this.onWarning,
+      info: info ?? this.info,
+      infoContainer: infoContainer ?? this.infoContainer,
+      onInfo: onInfo ?? this.onInfo,
+      gold: gold ?? this.gold,
+      silver: silver ?? this.silver,
+      bronze: bronze ?? this.bronze,
+    );
+  }
+
+  @override
+  SemanticColors lerp(ThemeExtension<SemanticColors>? other, double t) {
+    if (other is! SemanticColors) return this;
+    return SemanticColors(
+      success: Color.lerp(success, other.success, t)!,
+      successContainer: Color.lerp(successContainer, other.successContainer, t)!,
+      onSuccess: Color.lerp(onSuccess, other.onSuccess, t)!,
+      warning: Color.lerp(warning, other.warning, t)!,
+      warningContainer: Color.lerp(warningContainer, other.warningContainer, t)!,
+      onWarning: Color.lerp(onWarning, other.onWarning, t)!,
+      info: Color.lerp(info, other.info, t)!,
+      infoContainer: Color.lerp(infoContainer, other.infoContainer, t)!,
+      onInfo: Color.lerp(onInfo, other.onInfo, t)!,
+      gold: Color.lerp(gold, other.gold, t)!,
+      silver: Color.lerp(silver, other.silver, t)!,
+      bronze: Color.lerp(bronze, other.bronze, t)!,
+    );
+  }
+
+  static const light = SemanticColors(
+    success: Color(0xFF059669),
+    successContainer: Color(0xFFD1FAE5),
+    onSuccess: Color(0xFF065F46),
+    warning: Color(0xFFF59E0B),
+    warningContainer: Color(0xFFFEF3C7),
+    onWarning: Color(0xFF92400E),
+    info: Color(0xFF3B82F6),
+    infoContainer: Color(0xFFDEEBFF),
+    onInfo: Color(0xFF1E40AF),
+    gold: Color(0xFFFFD700),
+    silver: Color(0xFFC0C0C0),
+    bronze: Color(0xFFCD7F32),
+  );
+
+  static const dark = SemanticColors(
+    success: Color(0xFF10B981),
+    successContainer: Color(0xFF064E3B),
+    onSuccess: Color(0xFFD1FAE5),
+    warning: Color(0xFFFBBF24),
+    warningContainer: Color(0xFF78350F),
+    onWarning: Color(0xFFFEF3C7),
+    info: Color(0xFF60A5FA),
+    infoContainer: Color(0xFF1E3A8A),
+    onInfo: Color(0xFFDEEBFF),
+    gold: Color(0xFFFFD700),
+    silver: Color(0xFFC0C0C0),
+    bronze: Color(0xFFCD7F32),
+  );
+}
+
 class AppTheme {
   // --- Dark Theme Colors ---
   static const Color _darkBg = Color(0xFF0B0D10); // Deep Charcoal
@@ -56,6 +167,7 @@ class AppTheme {
       textPrimary: _darkTextPrimary,
       textSecondary: _darkTextSecondary,
       textMuted: _darkTextMuted,
+      semanticColors: SemanticColors.dark,
     );
   }
 
@@ -83,6 +195,7 @@ class AppTheme {
       textPrimary: _lightTextPrimary,
       textSecondary: _lightTextSecondary,
       textMuted: _lightTextMuted,
+      semanticColors: SemanticColors.light,
     );
   }
 
@@ -96,6 +209,7 @@ class AppTheme {
     required Color textPrimary,
     required Color textSecondary,
     required Color textMuted,
+    required SemanticColors semanticColors,
   }) {
     final isDark = brightness == Brightness.dark;
 
@@ -104,6 +218,7 @@ class AppTheme {
       brightness: brightness,
       colorScheme: colorScheme,
       scaffoldBackgroundColor: scaffoldBg,
+      extensions: <ThemeExtension<dynamic>>[semanticColors],
       
       // Typography
       textTheme: GoogleFonts.outfitTextTheme(

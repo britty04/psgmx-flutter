@@ -4,6 +4,7 @@ import '../../providers/user_provider.dart';
 import '../../models/app_user.dart';
 import '../../core/theme/app_dimens.dart';
 import '../widgets/premium_card.dart';
+import '../settings/settings_screen.dart';
 
 class ProfileScreen extends StatelessWidget {
   const ProfileScreen({super.key});
@@ -25,12 +26,15 @@ class ProfileScreen extends StatelessWidget {
           SliverAppBar(
             pinned: true,
             title: const Text("My Profile"),
-            centerTitle: true,
+            centerTitle: false,
             actions: [
+               const _NotificationBellIcon(),
                IconButton(
                  icon: const Icon(Icons.settings_outlined),
                  onPressed: () {
-                   ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Settings not implemented yet")));
+                   Navigator.of(context).push(
+                     MaterialPageRoute(builder: (context) => const SettingsScreen()),
+                   );
                  },
                )
             ],
@@ -210,13 +214,6 @@ class ProfileScreen extends StatelessWidget {
                       ),
                       Divider(height: 1, indent: 56, color: Theme.of(context).dividerColor.withValues(alpha: 0.5)),
                       ListTile(
-                        leading: const Icon(Icons.lock_outline),
-                        title: const Text("Change Password"),
-                        trailing: const Icon(Icons.chevron_right, size: 18),
-                        onTap: () {},
-                      ),
-                      Divider(height: 1, indent: 56, color: Theme.of(context).dividerColor.withValues(alpha: 0.5)),
-                      ListTile(
                         leading: const Icon(Icons.help_outline),
                         title: const Text("Help & Support"),
                         trailing: const Icon(Icons.chevron_right, size: 18),
@@ -245,7 +242,7 @@ class ProfileScreen extends StatelessWidget {
                 
                 const Center(
                    child: Text(
-                     "PSG Placement Prep v1.2.0", 
+                     "PSGMX - Placement Excellence v1.2.0", 
                      style: TextStyle(color: Colors.grey, fontSize: 10)
                    )
                 ),
@@ -361,6 +358,45 @@ class _SectionLabel extends StatelessWidget {
           color: Theme.of(context).colorScheme.primary,
           letterSpacing: 1.2
         )
+      ),
+    );
+  }
+}
+
+class _NotificationBellIcon extends StatelessWidget {
+  const _NotificationBellIcon();
+
+  @override
+  Widget build(BuildContext context) {
+    return IconButton(
+      onPressed: () {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Notifications coming soon!')),
+        );
+      },
+      icon: Stack(
+        clipBehavior: Clip.none,
+        children: [
+          Icon(
+            Icons.notifications_outlined,
+            color: Theme.of(context).colorScheme.onSurface,
+          ),
+          Positioned(
+            right: 0,
+            top: 0,
+            child: Container(
+              padding: const EdgeInsets.all(2),
+              decoration: BoxDecoration(
+                color: Theme.of(context).colorScheme.error,
+                shape: BoxShape.circle,
+              ),
+              constraints: const BoxConstraints(
+                minWidth: 8,
+                minHeight: 8,
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
