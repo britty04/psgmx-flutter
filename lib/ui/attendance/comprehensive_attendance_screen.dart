@@ -12,11 +12,11 @@ import '../widgets/premium_card.dart';
 
 /// Comprehensive Attendance Screen with Role-Based Access Control
 /// 
-/// ACCESS RULES:
-/// - Students: Only "My Attendance" tab (personal attendance history)
+/// STRICT ACCESS RULES:
+/// - Students: Only "My Attendance" tab
 /// - Team Leaders: "My Attendance" + "My Team" tabs
-/// - Coordinators: "My Attendance" + "My Team" + "Schedule Classes" tabs
-/// - Placement Rep: FULL ACCESS - All tabs including "Overall" and "Mark Attendance"
+/// - Coordinators: "My Attendance" + "My Team" + "Schedule" tabs
+/// - Placement Rep: "My Attendance" + "My Team" + "Schedule" + "Overall" tabs
 class ComprehensiveAttendanceScreen extends StatelessWidget {
   const ComprehensiveAttendanceScreen({super.key});
 
@@ -24,38 +24,53 @@ class ComprehensiveAttendanceScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final userProvider = Provider.of<UserProvider>(context);
     
-    // Role checks (considering simulation mode)
-    final isStudent = !userProvider.isTeamLeader && !userProvider.isCoordinator && !userProvider.isPlacementRep;
-    final isTeamLeader = userProvider.isTeamLeader;
+    // Determine effective role (considering simulation mode)
+    // Use hierarchical check: PlacementRep > Coordinator > TeamLeader > Student
+    final isActualPlacementRep = userProvider.isActualPlacementRep;
+    final isPlacementRep = userProvider.isPlacementRep;
     final isCoordinator = userProvider.isCoordinator;
-    final isPlacementRep = userProvider.isPlacementRep || userProvider.isActualPlacementRep;
+    final isTeamLeader = userProvider.isTeamLeader;
     
-    // Determine which tabs to show based on role
+    // Build tabs based on STRICT role hierarchy
     List<Widget> tabs = [];
     List<Widget> tabViews = [];
     
-    // Everyone gets "My Attendance"
+    // 1. Everyone gets "My Attendance"
     tabs.add(const Tab(text: 'My Attendance'));
     tabViews.add(const _MyAttendanceTab());
     
-    // Team Leaders and above get "My Team"
+    // 2. Team Leaders, Coordinators, and Placement Rep get "My Team"
     if (isTeamLeader || isCoordinator || isPlacementRep) {
       tabs.add(const Tab(text: 'My Team'));
       tabViews.add(const _MyTeamAttendanceTab());
     }
     
-    // Coordinators get "Schedule Classes" (read-only scheduling)
-    if (isCoordinator && !isPlacementRep) {
+    // 3. Coordinators and Placement Rep get "Schedule"
+    if (isCoordinator || isPlacementRep) {
       tabs.add(const Tab(text: 'Schedule'));
       tabViews.add(const _ScheduleClassesTab());
     }
     
-    // Only Placement Rep gets full access including "Overall"
-    if (isPlacementRep) {
-      tabs.add(const Tab(text: 'Schedule'));
-      tabViews.add(const _ScheduleClassesTab());
+    // 4. Only ACTUAL Placement Rep gets "Overall" (not when simulating other roles)
+    if (isActualPlacementRep) {
       tabs.add(const Tab(text: 'Overall'));
       tabViews.add(const _OverallAttendanceTab());
+    }
+    
+    // Calculate tab alignment based on count
+    // 1-2 tabs: Center, 3+ tabs: Spread evenly, 5+ tabs: Scrollable
+    final TabAlignment tabAlignment;
+    final bool isScrollable;
+    
+    if (tabs.length <= 2) {
+      tabAlignment = TabAlignment.center;
+      isScrollable = false;
+    } else if (tabs.length <= 4) {
+      tabAlignment = TabAlignment.fill;
+      isScrollable = false;
+    } else {
+      tabAlignment = TabAlignment.start;
+      isScrollable = true;
     }
 
     return DefaultTabController(
@@ -79,8 +94,16 @@ class ComprehensiveAttendanceScreen extends StatelessWidget {
                     ),
                   ),
                   child: TabBar(
-                    isScrollable: tabs.length > 3,
-                    tabAlignment: tabs.length > 3 ? TabAlignment.start : TabAlignment.fill,
+                    isScrollable: isScrollable,
+                    tabAlignment: tabAlignment,
+                    labelStyle: GoogleFonts.inter(
+                      fontWeight: FontWeight.w600,
+                      fontSize: 14,
+                    ),
+                    unselectedLabelStyle: GoogleFonts.inter(
+                      fontWeight: FontWeight.w500,
+                      fontSize: 14,
+                    ),
                     tabs: tabs,
                   ),
                 ),
@@ -849,6 +872,7 @@ class _ScheduleClassesTabState extends State<_ScheduleClassesTab> {
 
   Future<void> _showAddScheduleDialog(BuildContext context) async {
     final userProvider = Provider.of<UserProvider>(context, listen: false);
+    final scaffoldMessenger = ScaffoldMessenger.of(context);
     final selectedDate = await showDatePicker(
       context: context,
       initialDate: DateTime.now().add(const Duration(days: 1)),
@@ -865,7 +889,7 @@ class _ScheduleClassesTabState extends State<_ScheduleClassesTab> {
         );
         await _loadData();
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
+          scaffoldMessenger.showSnackBar(
             SnackBar(
               content: Text('Class scheduled for ${DateFormat('MMM dd, yyyy').format(selectedDate)}'),
               backgroundColor: Colors.green,
@@ -874,7 +898,7 @@ class _ScheduleClassesTabState extends State<_ScheduleClassesTab> {
         }
       } catch (e) {
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
+          scaffoldMessenger.showSnackBar(
             SnackBar(content: Text('Error scheduling: $e'), backgroundColor: Colors.red),
           );
         }
@@ -883,17 +907,18 @@ class _ScheduleClassesTabState extends State<_ScheduleClassesTab> {
   }
 
   Future<void> _deleteSchedule(String scheduleId) async {
+    final scaffoldMessenger = ScaffoldMessenger.of(context);
     try {
       await _scheduleService.deleteScheduledDate(scheduleId);
       await _loadData();
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
+        scaffoldMessenger.showSnackBar(
           const SnackBar(content: Text('Schedule removed'), backgroundColor: Colors.orange),
         );
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
+        scaffoldMessenger.showSnackBar(
           SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
         );
       }
@@ -1249,6 +1274,7 @@ class _OverallAttendanceTabState extends State<_OverallAttendanceTab> {
       context: context,
       builder: (context) => _MultiDatePickerDialog(
         onDatesSelected: (dates, notes) async {
+          final scaffoldMessenger = ScaffoldMessenger.of(context);
           try {
             final userProvider = Provider.of<UserProvider>(context, listen: false);
             
@@ -1263,13 +1289,13 @@ class _OverallAttendanceTabState extends State<_OverallAttendanceTab> {
             
             _loadData();
             if (mounted) {
-              ScaffoldMessenger.of(context).showSnackBar(
+              scaffoldMessenger.showSnackBar(
                 SnackBar(content: Text('${dates.length} date(s) scheduled successfully')),
               );
             }
           } catch (e) {
             if (mounted) {
-              ScaffoldMessenger.of(context).showSnackBar(
+              scaffoldMessenger.showSnackBar(
                 SnackBar(content: Text('Error: $e')),
               );
             }

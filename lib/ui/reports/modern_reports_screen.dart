@@ -5,6 +5,9 @@ import 'package:intl/intl.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../services/attendance_service.dart';
 import '../../services/attendance_schedule_service.dart';
+import '../../services/task_completion_service.dart';
+import '../../services/defaulter_service.dart';
+import '../../models/task_completion.dart';
 import '../../core/theme/app_dimens.dart';
 import '../widgets/premium_card.dart';
 
@@ -46,10 +49,12 @@ class _ModernReportsScreenState extends State<ModernReportsScreen> {
           .eq('status', 'PRESENT');
 
       // Get overall average
-      final summaries = await _attendanceService.getAllStudentsAttendanceSummary();
+      final summaries =
+          await _attendanceService.getAllStudentsAttendanceSummary();
       final avgPercentage = summaries.isEmpty
           ? 0.0
-          : summaries.fold<double>(0, (sum, s) => sum + s.attendancePercentage) /
+          : summaries.fold<double>(
+                  0, (sum, s) => sum + s.attendancePercentage) /
               summaries.length;
 
       // Get scheduled dates count
@@ -80,7 +85,7 @@ class _ModernReportsScreenState extends State<ModernReportsScreen> {
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
-    
+
     return Scaffold(
       body: RefreshIndicator(
         onRefresh: _loadStats,
@@ -106,6 +111,15 @@ class _ModernReportsScreenState extends State<ModernReportsScreen> {
                   delegate: SliverChildListDelegate([
                     _buildStatsOverview(colorScheme),
                     const SizedBox(height: AppSpacing.xl),
+
+                    // A1: Task Completion Section
+                    _buildTaskCompletionSection(colorScheme),
+                    const SizedBox(height: AppSpacing.xl),
+
+                    // B1: Defaulter Alerts Section
+                    _buildDefaulterAlertsSection(colorScheme),
+                    const SizedBox(height: AppSpacing.xl),
+
                     _buildQuickActions(colorScheme),
                     const SizedBox(height: AppSpacing.xl),
                     _buildExportSection(colorScheme),
@@ -188,7 +202,8 @@ class _ModernReportsScreenState extends State<ModernReportsScreen> {
     );
   }
 
-  Widget _buildStatCard(String label, String value, IconData icon, Color color) {
+  Widget _buildStatCard(
+      String label, String value, IconData icon, Color color) {
     return PremiumCard(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -268,6 +283,287 @@ class _ModernReportsScreenState extends State<ModernReportsScreen> {
           ),
         ),
       ],
+    );
+  }
+
+  // ========================================
+  // A1: TASK COMPLETION SECTION
+  // ========================================
+  Widget _buildTaskCompletionSection(ColorScheme colorScheme) {
+    return FutureBuilder<TaskCompletionSummary>(
+      future: TaskCompletionService().getGlobalCompletionStats(DateTime.now()),
+      builder: (context, snapshot) {
+        final stats = snapshot.data ?? TaskCompletionSummary.empty();
+        final percentage = stats.completionPercentage;
+        final color = percentage >= 80
+            ? Colors.green
+            : (percentage >= 50 ? Colors.orange : Colors.red);
+
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            _buildSectionHeader('TODAY\'S TASK COMPLETION', colorScheme),
+            const SizedBox(height: AppSpacing.md),
+            PremiumCard(
+              child: Column(
+                children: [
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              '${percentage.toStringAsFixed(1)}%',
+                              style: GoogleFonts.inter(
+                                fontSize: 32,
+                                fontWeight: FontWeight.bold,
+                                color: color,
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              '${stats.completedCount} of ${stats.totalMembers} students completed',
+                              style: GoogleFonts.inter(
+                                fontSize: 13,
+                                color: Colors.grey[600],
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      Container(
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          color: color.withValues(alpha: 0.1),
+                          shape: BoxShape.circle,
+                        ),
+                        child: Icon(
+                          percentage >= 80
+                              ? Icons.check_circle
+                              : Icons.pending_actions,
+                          color: color,
+                          size: 32,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: AppSpacing.md),
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(4),
+                    child: LinearProgressIndicator(
+                      value: percentage / 100,
+                      backgroundColor: Colors.grey[200],
+                      valueColor: AlwaysStoppedAnimation<Color>(color),
+                      minHeight: 8,
+                    ),
+                  ),
+                  const SizedBox(height: AppSpacing.md),
+                  OutlinedButton.icon(
+                    onPressed: () => _showTaskCompletionDetails(),
+                    icon: const Icon(Icons.visibility, size: 18),
+                    label: const Text('View Details'),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  Future<void> _showTaskCompletionDetails() async {
+    showDialog(
+      context: context,
+      builder: (ctx) => const _TaskCompletionDetailsDialog(),
+    );
+  }
+
+  // ========================================
+  // B1: DEFAULTER ALERTS SECTION
+  // ========================================
+  Widget _buildDefaulterAlertsSection(ColorScheme colorScheme) {
+    return FutureBuilder<DefaulterStats>(
+      future: DefaulterService().getDefaulterStats(),
+      builder: (context, snapshot) {
+        final stats = snapshot.data ?? DefaulterStats.empty();
+
+        if (stats.totalDefaulters == 0) {
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _buildSectionHeader('ATTENDANCE ALERTS', colorScheme),
+              const SizedBox(height: AppSpacing.md),
+              PremiumCard(
+                color: Colors.green.withValues(alpha: 0.05),
+                child: Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: Colors.green.withValues(alpha: 0.1),
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Icon(Icons.check_circle,
+                          color: Colors.green, size: 28),
+                    ),
+                    const SizedBox(width: AppSpacing.md),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'All Clear!',
+                            style: GoogleFonts.inter(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 16,
+                              color: Colors.green,
+                            ),
+                          ),
+                          Text(
+                            'No students currently flagged for attendance issues',
+                            style: GoogleFonts.inter(
+                              fontSize: 13,
+                              color: Colors.grey[600],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          );
+        }
+
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            _buildSectionHeader('ATTENDANCE ALERTS', colorScheme),
+            const SizedBox(height: AppSpacing.md),
+            PremiumCard(
+              color: Colors.red.withValues(alpha: 0.05),
+              child: Column(
+                children: [
+                  Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: Colors.red.withValues(alpha: 0.1),
+                          shape: BoxShape.circle,
+                        ),
+                        child: const Icon(Icons.warning_amber,
+                            color: Colors.red, size: 28),
+                      ),
+                      const SizedBox(width: AppSpacing.md),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              '${stats.totalDefaulters} Student(s) Flagged',
+                              style: GoogleFonts.inter(
+                                fontWeight: FontWeight.bold,
+                                fontSize: 16,
+                                color: Colors.red,
+                              ),
+                            ),
+                            Text(
+                              'Attendance issues detected',
+                              style: GoogleFonts.inter(
+                                fontSize: 13,
+                                color: Colors.grey[600],
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: AppSpacing.md),
+
+                  // Breakdown
+                  Row(
+                    children: [
+                      Expanded(
+                        child: _buildDefaulterStatChip(
+                          '${stats.lowAttendanceCount}',
+                          'Low %',
+                          Colors.orange,
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: _buildDefaulterStatChip(
+                          '${stats.consecutiveAbsenceCount}',
+                          'Consecutive',
+                          Colors.red,
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: _buildDefaulterStatChip(
+                          '${stats.bothCount}',
+                          'Both',
+                          Colors.purple,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: AppSpacing.md),
+                  OutlinedButton.icon(
+                    onPressed: () => _showDefaulterDetails(),
+                    icon: const Icon(Icons.visibility, size: 18),
+                    label: const Text('View Details'),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: Colors.red,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  Widget _buildDefaulterStatChip(String value, String label, Color color) {
+    return Container(
+      padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Column(
+        children: [
+          Text(
+            value,
+            style: GoogleFonts.inter(
+              fontWeight: FontWeight.bold,
+              fontSize: 18,
+              color: color,
+            ),
+          ),
+          Text(
+            label,
+            style: GoogleFonts.inter(
+              fontSize: 10,
+              color: color,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _showDefaulterDetails() async {
+    showDialog(
+      context: context,
+      builder: (ctx) => const _DefaulterDetailsDialog(),
     );
   }
 
@@ -385,7 +681,8 @@ class _ModernReportsScreenState extends State<ModernReportsScreen> {
       // Query team data from student_attendance_summary grouped by team
       final response = await _supabase
           .from('student_attendance_summary')
-          .select('team_id, batch, attendance_percentage, present_count, absent_count')
+          .select(
+              'team_id, batch, attendance_percentage, present_count, absent_count')
           .not('team_id', 'is', null);
 
       if (!mounted) return;
@@ -407,9 +704,9 @@ class _ModernReportsScreenState extends State<ModernReportsScreen> {
             'total_percentage': 0.0,
           };
         }
-        
+
         teamData[teamId]!['students'].add(student);
-        teamData[teamId]!['total_percentage'] += 
+        teamData[teamId]!['total_percentage'] +=
             (student['attendance_percentage'] ?? 0.0).toDouble();
       }
 
@@ -420,14 +717,14 @@ class _ModernReportsScreenState extends State<ModernReportsScreen> {
           'team_id': team['team_id'],
           'batch': team['batch'],
           'team_size': studentCount,
-          'team_attendance_percentage': studentCount > 0
-              ? team['total_percentage'] / studentCount
-              : 0.0,
+          'team_attendance_percentage':
+              studentCount > 0 ? team['total_percentage'] / studentCount : 0.0,
         };
       }).toList();
 
       // Sort by team_id
-      teams.sort((a, b) => (a['team_id'] as String).compareTo(b['team_id'] as String));
+      teams.sort(
+          (a, b) => (a['team_id'] as String).compareTo(b['team_id'] as String));
 
       if (!mounted) return;
 
@@ -459,7 +756,8 @@ class _ModernReportsScreenState extends State<ModernReportsScreen> {
     );
 
     try {
-      final summaries = await _attendanceService.getAllStudentsAttendanceSummary();
+      final summaries =
+          await _attendanceService.getAllStudentsAttendanceSummary();
       if (!mounted) return;
       Navigator.pop(context);
 
@@ -523,7 +821,8 @@ class _ModernReportsScreenState extends State<ModernReportsScreen> {
     );
 
     try {
-      final summaries = await _attendanceService.getAllStudentsAttendanceSummary();
+      final summaries =
+          await _attendanceService.getAllStudentsAttendanceSummary();
       if (!mounted) return;
       Navigator.pop(context);
 
@@ -579,7 +878,8 @@ class _ModernReportsScreenState extends State<ModernReportsScreen> {
     );
 
     try {
-      final summaries = await _attendanceService.getAllStudentsAttendanceSummary();
+      final summaries =
+          await _attendanceService.getAllStudentsAttendanceSummary();
       if (!mounted) return;
       Navigator.pop(context);
 
@@ -594,21 +894,25 @@ class _ModernReportsScreenState extends State<ModernReportsScreen> {
       text.writeln('═══════════════════════════════════════════');
       text.writeln('         ATTENDANCE SUMMARY REPORT          ');
       text.writeln('═══════════════════════════════════════════');
-      text.writeln('Generated: ${DateFormat('yyyy-MM-dd HH:mm').format(DateTime.now())}');
+      text.writeln(
+          'Generated: ${DateFormat('yyyy-MM-dd HH:mm').format(DateTime.now())}');
       text.writeln('Total Students: ${summaries.length}');
 
-      final avgPercentage = summaries.fold<double>(
-              0, (sum, s) => sum + s.attendancePercentage) /
-          summaries.length;
+      final avgPercentage =
+          summaries.fold<double>(0, (sum, s) => sum + s.attendancePercentage) /
+              summaries.length;
       text.writeln('Overall Average: ${avgPercentage.toStringAsFixed(2)}%');
       text.writeln('───────────────────────────────────────────\n');
 
       for (var i = 0; i < summaries.length; i++) {
         final student = summaries[i];
         text.writeln('${i + 1}. ${student.name} (${student.regNo})');
-        text.writeln('   Team: ${student.teamId ?? "No Team"} | ${student.batch}');
-        text.writeln('   Present: ${student.presentCount} | Absent: ${student.absentCount}');
-        text.writeln('   Attendance: ${student.attendancePercentage.toStringAsFixed(1)}%');
+        text.writeln(
+            '   Team: ${student.teamId ?? "No Team"} | ${student.batch}');
+        text.writeln(
+            '   Present: ${student.presentCount} | Absent: ${student.absentCount}');
+        text.writeln(
+            '   Attendance: ${student.attendancePercentage.toStringAsFixed(1)}%');
         text.writeln('');
       }
 
@@ -639,7 +943,6 @@ class _ModernReportsScreenState extends State<ModernReportsScreen> {
   }
 }
 
-
 // ========================================
 // LONG ABSENTEES DIALOG
 // ========================================
@@ -664,7 +967,7 @@ class _LongAbsenteesDialogState extends State<_LongAbsenteesDialog> {
 
     try {
       final supabase = Supabase.instance.client;
-      
+
       // Get all students
       final students = await supabase
           .from('users')
@@ -710,7 +1013,7 @@ class _LongAbsenteesDialogState extends State<_LongAbsenteesDialog> {
         final userId = record['user_id'] as String;
         final date = record['date'] as String;
         final status = record['status'] as String;
-        
+
         userAttendance.putIfAbsent(userId, () => {});
         userAttendance[userId]![date] = status;
       }
@@ -728,7 +1031,7 @@ class _LongAbsenteesDialogState extends State<_LongAbsenteesDialog> {
 
         for (final dateStr in scheduledDates) {
           final status = userRecords[dateStr];
-          
+
           // If no record or ABSENT, count as absent
           if (status == null || status == 'ABSENT') {
             currentStreak++;
@@ -752,8 +1055,8 @@ class _LongAbsenteesDialogState extends State<_LongAbsenteesDialog> {
       }
 
       // Sort by consecutive days descending
-      longAbsentees.sort((a, b) => 
-        (b['consecutive_days'] as int).compareTo(a['consecutive_days'] as int));
+      longAbsentees.sort((a, b) => (b['consecutive_days'] as int)
+          .compareTo(a['consecutive_days'] as int));
 
       if (mounted) {
         setState(() {
@@ -781,7 +1084,8 @@ class _LongAbsenteesDialogState extends State<_LongAbsenteesDialog> {
     buffer.writeln('═══════════════════════════════════════════');
     buffer.writeln('Consecutive Days: $_consecutiveDays+');
     buffer.writeln('Total Found: ${_absentees.length}');
-    buffer.writeln('Generated: ${DateFormat('yyyy-MM-dd HH:mm').format(DateTime.now())}');
+    buffer.writeln(
+        'Generated: ${DateFormat('yyyy-MM-dd HH:mm').format(DateTime.now())}');
     buffer.writeln('───────────────────────────────────────────\n');
 
     for (var i = 0; i < _absentees.length; i++) {
@@ -789,7 +1093,8 @@ class _LongAbsenteesDialogState extends State<_LongAbsenteesDialog> {
       buffer.writeln('${i + 1}. ${absentee['name']} (${absentee['reg_no']})');
       buffer.writeln('   Email: ${absentee['email']}');
       buffer.writeln('   Team: ${absentee['team_id'] ?? 'No Team'}');
-      buffer.writeln('   Consecutive Absences: ${absentee['consecutive_days']} days');
+      buffer.writeln(
+          '   Consecutive Absences: ${absentee['consecutive_days']} days');
       buffer.writeln('');
     }
 
@@ -812,7 +1117,7 @@ class _LongAbsenteesDialogState extends State<_LongAbsenteesDialog> {
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
-    
+
     return Dialog(
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       child: Container(
@@ -826,7 +1131,8 @@ class _LongAbsenteesDialogState extends State<_LongAbsenteesDialog> {
               padding: const EdgeInsets.all(20),
               decoration: BoxDecoration(
                 color: Colors.orange.withValues(alpha: 0.1),
-                borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
+                borderRadius:
+                    const BorderRadius.vertical(top: Radius.circular(16)),
               ),
               child: Row(
                 children: [
@@ -836,7 +1142,8 @@ class _LongAbsenteesDialogState extends State<_LongAbsenteesDialog> {
                       color: Colors.orange.withValues(alpha: 0.2),
                       borderRadius: BorderRadius.circular(12),
                     ),
-                    child: const Icon(Icons.warning_amber_rounded, color: Colors.orange, size: 28),
+                    child: const Icon(Icons.warning_amber_rounded,
+                        color: Colors.orange, size: 28),
                   ),
                   const SizedBox(width: 16),
                   Expanded(
@@ -880,12 +1187,14 @@ class _LongAbsenteesDialogState extends State<_LongAbsenteesDialog> {
                     Container(
                       padding: const EdgeInsets.all(16),
                       decoration: BoxDecoration(
-                        color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
+                        color: colorScheme.surfaceContainerHighest
+                            .withValues(alpha: 0.5),
                         borderRadius: BorderRadius.circular(12),
                       ),
                       child: Row(
                         children: [
-                          Icon(Icons.calendar_today, color: colorScheme.primary, size: 20),
+                          Icon(Icons.calendar_today,
+                              color: colorScheme.primary, size: 20),
                           const SizedBox(width: 12),
                           Expanded(
                             child: Text(
@@ -904,7 +1213,8 @@ class _LongAbsenteesDialogState extends State<_LongAbsenteesDialog> {
                             color: colorScheme.primary,
                           ),
                           Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 16, vertical: 8),
                             decoration: BoxDecoration(
                               color: colorScheme.primary.withValues(alpha: 0.1),
                               borderRadius: BorderRadius.circular(8),
@@ -940,7 +1250,8 @@ class _LongAbsenteesDialogState extends State<_LongAbsenteesDialog> {
                             ? const SizedBox(
                                 width: 18,
                                 height: 18,
-                                child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                                child: CircularProgressIndicator(
+                                    strokeWidth: 2, color: Colors.white),
                               )
                             : const Icon(Icons.search),
                         label: Text(
@@ -949,7 +1260,8 @@ class _LongAbsenteesDialogState extends State<_LongAbsenteesDialog> {
                         ),
                         style: FilledButton.styleFrom(
                           padding: const EdgeInsets.all(16),
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                          shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12)),
                         ),
                       ),
                     ),
@@ -989,7 +1301,8 @@ class _LongAbsenteesDialogState extends State<_LongAbsenteesDialog> {
                           ),
                           child: Column(
                             children: [
-                              Icon(Icons.check_circle, size: 48, color: Colors.green[400]),
+                              Icon(Icons.check_circle,
+                                  size: 48, color: Colors.green[400]),
                               const SizedBox(height: 12),
                               Text(
                                 'No Long Absentees Found',
@@ -1001,7 +1314,8 @@ class _LongAbsenteesDialogState extends State<_LongAbsenteesDialog> {
                               const SizedBox(height: 4),
                               Text(
                                 'No students with $_consecutiveDays+ consecutive absences',
-                                style: GoogleFonts.inter(color: Colors.grey[600]),
+                                style:
+                                    GoogleFonts.inter(color: Colors.grey[600]),
                               ),
                             ],
                           ),
@@ -1016,12 +1330,14 @@ class _LongAbsenteesDialogState extends State<_LongAbsenteesDialog> {
                           child: ListView.separated(
                             shrinkWrap: true,
                             itemCount: _absentees.length,
-                            separatorBuilder: (_, __) => const Divider(height: 1),
+                            separatorBuilder: (_, __) =>
+                                const Divider(height: 1),
                             itemBuilder: (context, index) {
                               final absentee = _absentees[index];
                               return ListTile(
                                 leading: CircleAvatar(
-                                  backgroundColor: Colors.red.withValues(alpha: 0.1),
+                                  backgroundColor:
+                                      Colors.red.withValues(alpha: 0.1),
                                   child: Text(
                                     '${index + 1}',
                                     style: GoogleFonts.inter(
@@ -1032,14 +1348,16 @@ class _LongAbsenteesDialogState extends State<_LongAbsenteesDialog> {
                                 ),
                                 title: Text(
                                   absentee['name'],
-                                  style: GoogleFonts.inter(fontWeight: FontWeight.w600),
+                                  style: GoogleFonts.inter(
+                                      fontWeight: FontWeight.w600),
                                 ),
                                 subtitle: Text(
                                   '${absentee['reg_no']} • ${absentee['team_id'] ?? 'No Team'}',
                                   style: GoogleFonts.inter(fontSize: 12),
                                 ),
                                 trailing: Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 10, vertical: 6),
                                   decoration: BoxDecoration(
                                     color: Colors.red.withValues(alpha: 0.1),
                                     borderRadius: BorderRadius.circular(16),
@@ -1068,7 +1386,6 @@ class _LongAbsenteesDialogState extends State<_LongAbsenteesDialog> {
     );
   }
 }
-
 
 // ========================================
 // TEAM ANALYSIS DIALOG
@@ -1111,12 +1428,14 @@ class _TeamAnalysisDialogState extends State<_TeamAnalysisDialog> {
     buffer.writeln('         TEAM ATTENDANCE ANALYSIS           ');
     buffer.writeln('═══════════════════════════════════════════');
     buffer.writeln('Total Teams: ${widget.teams.length}');
-    buffer.writeln('Generated: ${DateFormat('yyyy-MM-dd HH:mm').format(DateTime.now())}');
+    buffer.writeln(
+        'Generated: ${DateFormat('yyyy-MM-dd HH:mm').format(DateTime.now())}');
     buffer.writeln('───────────────────────────────────────────\n');
 
     for (var i = 0; i < _sortedTeams.length; i++) {
       final team = _sortedTeams[i];
-      final percentage = (team['team_attendance_percentage'] as double).toStringAsFixed(1);
+      final percentage =
+          (team['team_attendance_percentage'] as double).toStringAsFixed(1);
       buffer.writeln('${i + 1}. ${team['team_id']}');
       buffer.writeln('   Batch: ${team['batch']}');
       buffer.writeln('   Members: ${team['team_size']}');
@@ -1142,7 +1461,7 @@ class _TeamAnalysisDialogState extends State<_TeamAnalysisDialog> {
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
-    
+
     return Dialog(
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       child: Container(
@@ -1156,7 +1475,8 @@ class _TeamAnalysisDialogState extends State<_TeamAnalysisDialog> {
               padding: const EdgeInsets.all(20),
               decoration: BoxDecoration(
                 color: Colors.green.withValues(alpha: 0.1),
-                borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
+                borderRadius:
+                    const BorderRadius.vertical(top: Radius.circular(16)),
               ),
               child: Row(
                 children: [
@@ -1166,7 +1486,8 @@ class _TeamAnalysisDialogState extends State<_TeamAnalysisDialog> {
                       color: Colors.green.withValues(alpha: 0.2),
                       borderRadius: BorderRadius.circular(12),
                     ),
-                    child: const Icon(Icons.groups_rounded, color: Colors.green, size: 28),
+                    child: const Icon(Icons.groups_rounded,
+                        color: Colors.green, size: 28),
                   ),
                   const SizedBox(width: 16),
                   Expanded(
@@ -1208,13 +1529,15 @@ class _TeamAnalysisDialogState extends State<_TeamAnalysisDialog> {
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
               decoration: BoxDecoration(
-                color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
+                color:
+                    colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
               ),
               child: Row(
                 children: [
                   Text(
                     'Sort by:',
-                    style: GoogleFonts.inter(fontWeight: FontWeight.w600, fontSize: 13),
+                    style: GoogleFonts.inter(
+                        fontWeight: FontWeight.w600, fontSize: 13),
                   ),
                   const SizedBox(width: 12),
                   SegmentedButton<String>(
@@ -1224,15 +1547,19 @@ class _TeamAnalysisDialogState extends State<_TeamAnalysisDialog> {
                       ButtonSegment(value: 'size', label: Text('Size')),
                     ],
                     selected: {_sortBy},
-                    onSelectionChanged: (value) => setState(() => _sortBy = value.first),
+                    onSelectionChanged: (value) =>
+                        setState(() => _sortBy = value.first),
                     style: ButtonStyle(
                       visualDensity: VisualDensity.compact,
-                      textStyle: WidgetStatePropertyAll(GoogleFonts.inter(fontSize: 12)),
+                      textStyle: WidgetStatePropertyAll(
+                          GoogleFonts.inter(fontSize: 12)),
                     ),
                   ),
                   const SizedBox(width: 8),
                   IconButton(
-                    icon: Icon(_ascending ? Icons.arrow_upward : Icons.arrow_downward, size: 18),
+                    icon: Icon(
+                        _ascending ? Icons.arrow_upward : Icons.arrow_downward,
+                        size: 18),
                     onPressed: () => setState(() => _ascending = !_ascending),
                     tooltip: _ascending ? 'Ascending' : 'Descending',
                     visualDensity: VisualDensity.compact,
@@ -1250,7 +1577,8 @@ class _TeamAnalysisDialogState extends State<_TeamAnalysisDialog> {
                         child: Column(
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            Icon(Icons.groups_outlined, size: 48, color: Colors.grey[400]),
+                            Icon(Icons.groups_outlined,
+                                size: 48, color: Colors.grey[400]),
                             const SizedBox(height: 12),
                             Text(
                               'No Teams Found',
@@ -1273,7 +1601,8 @@ class _TeamAnalysisDialogState extends State<_TeamAnalysisDialog> {
                       separatorBuilder: (_, __) => const Divider(height: 1),
                       itemBuilder: (context, index) {
                         final team = _sortedTeams[index];
-                        final percentage = (team['team_attendance_percentage'] as double);
+                        final percentage =
+                            (team['team_attendance_percentage'] as double);
                         final isGood = percentage >= 75;
                         final color = isGood ? Colors.green : Colors.red;
 
@@ -1287,7 +1616,10 @@ class _TeamAnalysisDialogState extends State<_TeamAnalysisDialog> {
                             ),
                             child: Center(
                               child: Text(
-                                team['team_id'].toString().replaceAll('Team', '').trim(),
+                                team['team_id']
+                                    .toString()
+                                    .replaceAll('Team', '')
+                                    .trim(),
                                 style: GoogleFonts.inter(
                                   color: color,
                                   fontWeight: FontWeight.bold,
@@ -1298,14 +1630,16 @@ class _TeamAnalysisDialogState extends State<_TeamAnalysisDialog> {
                           ),
                           title: Text(
                             team['team_id'] ?? 'Unknown',
-                            style: GoogleFonts.inter(fontWeight: FontWeight.w600),
+                            style:
+                                GoogleFonts.inter(fontWeight: FontWeight.w600),
                           ),
                           subtitle: Text(
                             '${team['team_size']} members • ${team['batch']}',
                             style: GoogleFonts.inter(fontSize: 12),
                           ),
                           trailing: Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 12, vertical: 6),
                             decoration: BoxDecoration(
                               color: color.withValues(alpha: 0.1),
                               borderRadius: BorderRadius.circular(16),
@@ -1329,7 +1663,6 @@ class _TeamAnalysisDialogState extends State<_TeamAnalysisDialog> {
     );
   }
 }
-
 
 // ========================================
 // ALL STUDENTS DIALOG
@@ -1392,7 +1725,8 @@ class _AllStudentsDialogState extends State<_AllStudentsDialog> {
               padding: const EdgeInsets.all(20),
               decoration: BoxDecoration(
                 color: Colors.blue.withValues(alpha: 0.1),
-                borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
+                borderRadius:
+                    const BorderRadius.vertical(top: Radius.circular(16)),
               ),
               child: Row(
                 children: [
@@ -1402,7 +1736,8 @@ class _AllStudentsDialogState extends State<_AllStudentsDialog> {
                       color: Colors.blue.withValues(alpha: 0.2),
                       borderRadius: BorderRadius.circular(12),
                     ),
-                    child: const Icon(Icons.people_alt_rounded, color: Colors.blue, size: 28),
+                    child: const Icon(Icons.people_alt_rounded,
+                        color: Colors.blue, size: 28),
                   ),
                   const SizedBox(width: 16),
                   Expanded(
@@ -1438,7 +1773,8 @@ class _AllStudentsDialogState extends State<_AllStudentsDialog> {
             Container(
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
-                color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
+                color:
+                    colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
               ),
               child: Column(
                 children: [
@@ -1453,32 +1789,44 @@ class _AllStudentsDialogState extends State<_AllStudentsDialog> {
                         borderRadius: BorderRadius.circular(10),
                         borderSide: BorderSide.none,
                       ),
-                      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                      contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 16, vertical: 12),
                     ),
                   ),
                   const SizedBox(height: 12),
                   Row(
                     children: [
-                      Text('Sort by:', style: GoogleFonts.inter(fontWeight: FontWeight.w600, fontSize: 13)),
+                      Text('Sort by:',
+                          style: GoogleFonts.inter(
+                              fontWeight: FontWeight.w600, fontSize: 13)),
                       const SizedBox(width: 12),
                       Expanded(
                         child: SegmentedButton<String>(
                           segments: const [
                             ButtonSegment(value: 'name', label: Text('Name')),
-                            ButtonSegment(value: 'percentage', label: Text('Attendance')),
-                            ButtonSegment(value: 'reg_no', label: Text('Reg No')),
+                            ButtonSegment(
+                                value: 'percentage', label: Text('Attendance')),
+                            ButtonSegment(
+                                value: 'reg_no', label: Text('Reg No')),
                           ],
                           selected: {_sortBy},
-                          onSelectionChanged: (v) => setState(() => _sortBy = v.first),
+                          onSelectionChanged: (v) =>
+                              setState(() => _sortBy = v.first),
                           style: ButtonStyle(
                             visualDensity: VisualDensity.compact,
-                            textStyle: WidgetStatePropertyAll(GoogleFonts.inter(fontSize: 11)),
+                            textStyle: WidgetStatePropertyAll(
+                                GoogleFonts.inter(fontSize: 11)),
                           ),
                         ),
                       ),
                       IconButton(
-                        icon: Icon(_ascending ? Icons.arrow_upward : Icons.arrow_downward, size: 18),
-                        onPressed: () => setState(() => _ascending = !_ascending),
+                        icon: Icon(
+                            _ascending
+                                ? Icons.arrow_upward
+                                : Icons.arrow_downward,
+                            size: 18),
+                        onPressed: () =>
+                            setState(() => _ascending = !_ascending),
                         visualDensity: VisualDensity.compact,
                       ),
                     ],
@@ -1496,11 +1844,13 @@ class _AllStudentsDialogState extends State<_AllStudentsDialog> {
                         child: Column(
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            Icon(Icons.search_off, size: 48, color: Colors.grey[400]),
+                            Icon(Icons.search_off,
+                                size: 48, color: Colors.grey[400]),
                             const SizedBox(height: 12),
                             Text(
                               'No students found',
-                              style: GoogleFonts.poppins(fontSize: 16, fontWeight: FontWeight.w600),
+                              style: GoogleFonts.poppins(
+                                  fontSize: 16, fontWeight: FontWeight.w600),
                             ),
                             Text(
                               'Try a different search term',
@@ -1525,12 +1875,14 @@ class _AllStudentsDialogState extends State<_AllStudentsDialog> {
                             backgroundColor: color.withValues(alpha: 0.1),
                             child: Text(
                               student.name[0].toUpperCase(),
-                              style: TextStyle(color: color, fontWeight: FontWeight.bold),
+                              style: TextStyle(
+                                  color: color, fontWeight: FontWeight.bold),
                             ),
                           ),
                           title: Text(
                             student.name,
-                            style: GoogleFonts.inter(fontWeight: FontWeight.w600),
+                            style:
+                                GoogleFonts.inter(fontWeight: FontWeight.w600),
                           ),
                           subtitle: Text(
                             '${student.regNo} • ${student.teamId ?? "No Team"}',
@@ -1541,7 +1893,8 @@ class _AllStudentsDialogState extends State<_AllStudentsDialog> {
                             crossAxisAlignment: CrossAxisAlignment.end,
                             children: [
                               Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 10, vertical: 4),
                                 decoration: BoxDecoration(
                                   color: color.withValues(alpha: 0.1),
                                   borderRadius: BorderRadius.circular(12),
@@ -1558,7 +1911,8 @@ class _AllStudentsDialogState extends State<_AllStudentsDialog> {
                               const SizedBox(height: 2),
                               Text(
                                 '${student.presentCount}/${student.totalWorkingDays}',
-                                style: GoogleFonts.inter(fontSize: 11, color: Colors.grey[600]),
+                                style: GoogleFonts.inter(
+                                    fontSize: 11, color: Colors.grey[600]),
                               ),
                             ],
                           ),
@@ -1572,7 +1926,6 @@ class _AllStudentsDialogState extends State<_AllStudentsDialog> {
     );
   }
 }
-
 
 // ========================================
 // SCHEDULED CLASSES DIALOG
@@ -1599,7 +1952,8 @@ class _ScheduledClassesDialog extends StatelessWidget {
               padding: const EdgeInsets.all(20),
               decoration: BoxDecoration(
                 color: Colors.purple.withValues(alpha: 0.1),
-                borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
+                borderRadius:
+                    const BorderRadius.vertical(top: Radius.circular(16)),
               ),
               child: Row(
                 children: [
@@ -1609,7 +1963,8 @@ class _ScheduledClassesDialog extends StatelessWidget {
                       color: Colors.purple.withValues(alpha: 0.2),
                       borderRadius: BorderRadius.circular(12),
                     ),
-                    child: const Icon(Icons.event_note_rounded, color: Colors.purple, size: 28),
+                    child: const Icon(Icons.event_note_rounded,
+                        color: Colors.purple, size: 28),
                   ),
                   const SizedBox(width: 16),
                   Expanded(
@@ -1650,11 +2005,13 @@ class _ScheduledClassesDialog extends StatelessWidget {
                         child: Column(
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            Icon(Icons.event_busy, size: 48, color: Colors.grey[400]),
+                            Icon(Icons.event_busy,
+                                size: 48, color: Colors.grey[400]),
                             const SizedBox(height: 12),
                             Text(
                               'No Scheduled Classes',
-                              style: GoogleFonts.poppins(fontSize: 16, fontWeight: FontWeight.w600),
+                              style: GoogleFonts.poppins(
+                                  fontSize: 16, fontWeight: FontWeight.w600),
                             ),
                             Text(
                               'Add scheduled dates in the Attendance screen',
@@ -1670,7 +2027,8 @@ class _ScheduledClassesDialog extends StatelessWidget {
                       separatorBuilder: (_, __) => const Divider(height: 1),
                       itemBuilder: (context, index) {
                         final date = scheduled[index];
-                        final dateStr = DateFormat('EEE, MMM dd, yyyy').format(date.date);
+                        final dateStr =
+                            DateFormat('EEE, MMM dd, yyyy').format(date.date);
                         final isPast = date.date.isBefore(now);
 
                         return ListTile(
@@ -1678,7 +2036,8 @@ class _ScheduledClassesDialog extends StatelessWidget {
                             width: 48,
                             height: 48,
                             decoration: BoxDecoration(
-                              color: (isPast ? Colors.green : Colors.blue).withValues(alpha: 0.1),
+                              color: (isPast ? Colors.green : Colors.blue)
+                                  .withValues(alpha: 0.1),
                               borderRadius: BorderRadius.circular(12),
                             ),
                             child: Icon(
@@ -1688,16 +2047,19 @@ class _ScheduledClassesDialog extends StatelessWidget {
                           ),
                           title: Text(
                             dateStr,
-                            style: GoogleFonts.inter(fontWeight: FontWeight.w600),
+                            style:
+                                GoogleFonts.inter(fontWeight: FontWeight.w600),
                           ),
                           subtitle: Text(
                             date.notes ?? 'No notes',
                             style: GoogleFonts.inter(fontSize: 12),
                           ),
                           trailing: Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 10, vertical: 4),
                             decoration: BoxDecoration(
-                              color: (isPast ? Colors.green : Colors.blue).withValues(alpha: 0.1),
+                              color: (isPast ? Colors.green : Colors.blue)
+                                  .withValues(alpha: 0.1),
                               borderRadius: BorderRadius.circular(12),
                             ),
                             child: Text(
@@ -1712,6 +2074,420 @@ class _ScheduledClassesDialog extends StatelessWidget {
                         );
                       },
                     ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ========================================
+// A1: TASK COMPLETION DETAILS DIALOG
+// ========================================
+class _TaskCompletionDetailsDialog extends StatefulWidget {
+  const _TaskCompletionDetailsDialog();
+
+  @override
+  State<_TaskCompletionDetailsDialog> createState() =>
+      _TaskCompletionDetailsDialogState();
+}
+
+class _TaskCompletionDetailsDialogState
+    extends State<_TaskCompletionDetailsDialog> {
+  List<UserTaskStatus> _allStudents = [];
+  bool _isLoading = true;
+  String _filter = 'all'; // all, completed, pending
+
+  @override
+  void initState() {
+    super.initState();
+    _loadData();
+  }
+
+  Future<void> _loadData() async {
+    setState(() => _isLoading = true);
+    try {
+      final students = await TaskCompletionService()
+          .getAllStudentCompletions(DateTime.now());
+      if (mounted) {
+        setState(() {
+          _allStudents = students;
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
+  List<UserTaskStatus> get _filteredStudents {
+    switch (_filter) {
+      case 'completed':
+        return _allStudents.where((s) => s.completed).toList();
+      case 'pending':
+        return _allStudents.where((s) => !s.completed).toList();
+      default:
+        return _allStudents;
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final completed = _allStudents.where((s) => s.completed).length;
+    final pending = _allStudents.where((s) => !s.completed).length;
+
+    return Dialog(
+      child: Container(
+        width: MediaQuery.of(context).size.width * 0.9,
+        height: MediaQuery.of(context).size.height * 0.7,
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          children: [
+            // Header
+            Row(
+              children: [
+                const Icon(Icons.task_alt, color: Colors.blue, size: 28),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Task Completion - Today',
+                        style: GoogleFonts.poppins(
+                          fontSize: 18,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      Text(
+                        '$completed completed • $pending pending',
+                        style: GoogleFonts.inter(
+                          fontSize: 13,
+                          color: Colors.grey[600],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                IconButton(
+                  icon: const Icon(Icons.close),
+                  onPressed: () => Navigator.pop(context),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+
+            // Filter Chips
+            Row(
+              children: [
+                FilterChip(
+                  label: Text('All (${_allStudents.length})'),
+                  selected: _filter == 'all',
+                  onSelected: (_) => setState(() => _filter = 'all'),
+                ),
+                const SizedBox(width: 8),
+                FilterChip(
+                  label: Text('Completed ($completed)'),
+                  selected: _filter == 'completed',
+                  onSelected: (_) => setState(() => _filter = 'completed'),
+                  selectedColor: Colors.green.withValues(alpha: 0.2),
+                ),
+                const SizedBox(width: 8),
+                FilterChip(
+                  label: Text('Pending ($pending)'),
+                  selected: _filter == 'pending',
+                  onSelected: (_) => setState(() => _filter = 'pending'),
+                  selectedColor: Colors.red.withValues(alpha: 0.2),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+
+            // List
+            Expanded(
+              child: _isLoading
+                  ? const Center(child: CircularProgressIndicator())
+                  : _filteredStudents.isEmpty
+                      ? Center(
+                          child: Text(
+                            'No students found',
+                            style: GoogleFonts.inter(color: Colors.grey),
+                          ),
+                        )
+                      : ListView.separated(
+                          itemCount: _filteredStudents.length,
+                          separatorBuilder: (_, __) => const Divider(height: 1),
+                          itemBuilder: (context, index) {
+                            final student = _filteredStudents[index];
+                            return ListTile(
+                              leading: CircleAvatar(
+                                backgroundColor: student.completed
+                                    ? Colors.green.withValues(alpha: 0.1)
+                                    : Colors.grey.withValues(alpha: 0.1),
+                                child: Icon(
+                                  student.completed
+                                      ? Icons.check
+                                      : Icons.pending,
+                                  color: student.completed
+                                      ? Colors.green
+                                      : Colors.grey,
+                                  size: 20,
+                                ),
+                              ),
+                              title: Text(
+                                student.name,
+                                style: GoogleFonts.inter(
+                                    fontWeight: FontWeight.w600),
+                              ),
+                              subtitle: Text(
+                                '${student.regNo} • Team ${student.teamId ?? "N/A"}',
+                                style: GoogleFonts.inter(fontSize: 12),
+                              ),
+                              trailing: student.completed
+                                  ? Container(
+                                      padding: const EdgeInsets.symmetric(
+                                          horizontal: 8, vertical: 4),
+                                      decoration: BoxDecoration(
+                                        color:
+                                            Colors.green.withValues(alpha: 0.1),
+                                        borderRadius: BorderRadius.circular(12),
+                                      ),
+                                      child: Text(
+                                        '✓ Done',
+                                        style: GoogleFonts.inter(
+                                          fontSize: 12,
+                                          fontWeight: FontWeight.w600,
+                                          color: Colors.green,
+                                        ),
+                                      ),
+                                    )
+                                  : Container(
+                                      padding: const EdgeInsets.symmetric(
+                                          horizontal: 8, vertical: 4),
+                                      decoration: BoxDecoration(
+                                        color:
+                                            Colors.red.withValues(alpha: 0.1),
+                                        borderRadius: BorderRadius.circular(12),
+                                      ),
+                                      child: Text(
+                                        'Pending',
+                                        style: GoogleFonts.inter(
+                                          fontSize: 12,
+                                          fontWeight: FontWeight.w600,
+                                          color: Colors.red,
+                                        ),
+                                      ),
+                                    ),
+                            );
+                          },
+                        ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ========================================
+// B1: DEFAULTER DETAILS DIALOG
+// ========================================
+class _DefaulterDetailsDialog extends StatefulWidget {
+  const _DefaulterDetailsDialog();
+
+  @override
+  State<_DefaulterDetailsDialog> createState() =>
+      _DefaulterDetailsDialogState();
+}
+
+class _DefaulterDetailsDialogState extends State<_DefaulterDetailsDialog> {
+  List<DefaulterInfo> _defaulters = [];
+  bool _isLoading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadData();
+  }
+
+  Future<void> _loadData() async {
+    setState(() => _isLoading = true);
+    try {
+      final defaulters = await DefaulterService().getAllDefaulters();
+      if (mounted) {
+        setState(() {
+          _defaulters = defaulters;
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Dialog(
+      child: Container(
+        width: MediaQuery.of(context).size.width * 0.9,
+        height: MediaQuery.of(context).size.height * 0.7,
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          children: [
+            // Header
+            Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: Colors.red.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: const Icon(Icons.warning_amber,
+                      color: Colors.red, size: 24),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Flagged Students',
+                        style: GoogleFonts.poppins(
+                          fontSize: 18,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      Text(
+                        '${_defaulters.length} students with attendance issues',
+                        style: GoogleFonts.inter(
+                          fontSize: 13,
+                          color: Colors.grey[600],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                IconButton(
+                  icon: const Icon(Icons.close),
+                  onPressed: () => Navigator.pop(context),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+
+            // Note: Not visible to students
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: Colors.amber.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Row(
+                children: [
+                  const Icon(Icons.info_outline, size: 16, color: Colors.amber),
+                  const SizedBox(width: 8),
+                  Text(
+                    'This information is NOT visible to students',
+                    style: GoogleFonts.inter(
+                        fontSize: 12, color: Colors.amber[800]),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 16),
+
+            // List
+            Expanded(
+              child: _isLoading
+                  ? const Center(child: CircularProgressIndicator())
+                  : _defaulters.isEmpty
+                      ? Center(
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              const Icon(Icons.check_circle,
+                                  size: 48, color: Colors.green),
+                              const SizedBox(height: 12),
+                              Text(
+                                'No flagged students',
+                                style: GoogleFonts.inter(color: Colors.grey),
+                              ),
+                            ],
+                          ),
+                        )
+                      : ListView.separated(
+                          itemCount: _defaulters.length,
+                          separatorBuilder: (_, __) => const Divider(height: 1),
+                          itemBuilder: (context, index) {
+                            final d = _defaulters[index];
+                            return ListTile(
+                              leading: CircleAvatar(
+                                backgroundColor:
+                                    Colors.red.withValues(alpha: 0.1),
+                                child: Text(
+                                  d.studentName.isNotEmpty
+                                      ? d.studentName[0]
+                                      : '?',
+                                  style: const TextStyle(
+                                    color: Colors.red,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ),
+                              title: Text(
+                                d.studentName,
+                                style: GoogleFonts.inter(
+                                    fontWeight: FontWeight.w600),
+                              ),
+                              subtitle: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    '${d.studentRegNo} • Team ${d.teamId ?? "N/A"}',
+                                    style: GoogleFonts.inter(fontSize: 12),
+                                  ),
+                                  const SizedBox(height: 4),
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(
+                                        horizontal: 6, vertical: 2),
+                                    decoration: BoxDecoration(
+                                      color: Colors.red.withValues(alpha: 0.1),
+                                      borderRadius: BorderRadius.circular(4),
+                                    ),
+                                    child: Text(
+                                      d.flag.defaulterReason,
+                                      style: GoogleFonts.inter(
+                                        fontSize: 10,
+                                        color: Colors.red,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              trailing: Column(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  if (d.flag.attendancePercentage != null)
+                                    Text(
+                                      '${d.flag.attendancePercentage!.toStringAsFixed(1)}%',
+                                      style: GoogleFonts.inter(
+                                        fontWeight: FontWeight.bold,
+                                        color: Colors.red,
+                                      ),
+                                    ),
+                                  Text(
+                                    '${d.flag.consecutiveAbsences} absent',
+                                    style: GoogleFonts.inter(
+                                        fontSize: 10, color: Colors.grey),
+                                  ),
+                                ],
+                              ),
+                              isThreeLine: true,
+                            );
+                          },
+                        ),
             ),
           ],
         ),

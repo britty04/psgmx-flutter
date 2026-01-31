@@ -8,6 +8,7 @@ import 'providers/user_provider.dart';
 import 'providers/leetcode_provider.dart';
 import 'providers/announcement_provider.dart';
 import 'providers/attendance_provider.dart';
+import 'providers/theme_provider.dart';
 import 'services/auth_service.dart';
 import 'services/supabase_service.dart';
 import 'services/supabase_db_service.dart';
@@ -31,15 +32,16 @@ void main() async {
   };
 
   try {
-    debugPrint('[APP] Initializing NotificationService...');
-    await NotificationService().init();
-
     debugPrint('[APP] Initializing Supabase...');
     await Supabase.initialize(
       url: SupabaseConfig.supabaseUrl,
       anonKey: SupabaseConfig.supabaseAnonKey,
     );
     debugPrint('[APP] Supabase initialized successfully');
+
+    debugPrint('[APP] Initializing NotificationService...');
+    await NotificationService().init();
+    debugPrint('[APP] NotificationService initialized successfully');
 
     debugPrint('[APP] Initializing UpdateService...');
     await UpdateService().initialize();
@@ -82,6 +84,9 @@ class PsgMxApp extends StatelessWidget {
         ),
         ChangeNotifierProvider(
           create: (_) => AttendanceProvider(supabaseService),
+        ),
+        ChangeNotifierProvider(
+          create: (_) => ThemeProvider(),
         ),
       ],
       child: const PsgMxAppInner(),
@@ -134,12 +139,14 @@ class _PsgMxAppInnerState extends State<PsgMxAppInner> {
 
   @override
   Widget build(BuildContext context) {
+    final themeProvider = Provider.of<ThemeProvider>(context);
+    
     return MaterialApp.router(
       title: 'PSGMX - Placement Excellence',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.light(),
       darkTheme: AppTheme.dark(),
-      themeMode: ThemeMode.system,
+      themeMode: themeProvider.themeMode,
       routerConfig: _router,
       builder: (context, child) {
         // Wrap with UpdateGate to enforce version checks
