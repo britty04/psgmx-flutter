@@ -81,7 +81,7 @@ flutter run -d ios
 
 ## 📦 Build for Production
 
-### Web (For Vercel Deployment)
+### Web (For Firebase Hosting)
 ```bash
 flutter build web --release --web-renderer canvaskit
 ```
@@ -95,6 +95,26 @@ flutter build apk --release
 ```bash
 flutter build ios --release
 ```
+
+---
+
+## 🌐 Deploy to Firebase Hosting
+
+### Quick Deploy
+```bash
+# Build
+flutter build web --release --web-renderer canvaskit
+
+# Deploy
+firebase deploy --only hosting
+```
+
+### Automatic Deployment
+Every push to `main` branch automatically deploys via GitHub Actions!
+
+**See complete setup guide**: [FIREBASE_DEPLOYMENT.md](FIREBASE_DEPLOYMENT.md)
+
+**Your live URL**: `https://your-project-id.web.app`
 
 ---
 
