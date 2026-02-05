@@ -2,6 +2,13 @@
 
 All notable changes to PSG MCA Placement Prep App will be documented in this file.
 
+## [2.2.1] - 2026-02-05
+
+### 🔧 Fixes
+- Fixed Android keystore compatibility issues ("Tag number over 30 not supported")
+- Updated keystore to PKCS12 format with 2048-bit RSA keys for Android build tools compatibility
+- Ensured proper keystore format for GitHub Actions releases
+
 ## [2.1.0] - 2026-02-05
 
 ### 🎉 Production Release - Open Source Ready
