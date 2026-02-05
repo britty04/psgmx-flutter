@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:provider/provider.dart';
@@ -40,13 +41,18 @@ void main() async {
     );
     debugPrint('[APP] Supabase initialized successfully');
 
-    debugPrint('[APP] Initializing NotificationService...');
-    await NotificationService().init();
-    debugPrint('[APP] NotificationService initialized successfully');
+    // Skip notification services on web
+    if (!kIsWeb) {
+      debugPrint('[APP] Initializing NotificationService...');
+      await NotificationService().init();
+      debugPrint('[APP] NotificationService initialized successfully');
 
-    debugPrint('[APP] Initializing BirthdayNotificationService...');
-    await BirthdayNotificationService().init();
-    debugPrint('[APP] BirthdayNotificationService initialized successfully');
+      debugPrint('[APP] Initializing BirthdayNotificationService...');
+      await BirthdayNotificationService().init();
+      debugPrint('[APP] BirthdayNotificationService initialized successfully');
+    } else {
+      debugPrint('[APP] Web platform detected - skipping notification services');
+    }
 
     debugPrint('[APP] Initializing UpdateService...');
     await UpdateService().initialize();

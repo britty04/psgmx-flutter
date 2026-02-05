@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:timezone/data/latest.dart' as tz;
@@ -32,6 +33,14 @@ class NotificationService {
 
   Future<void> init() async {
     if (_isInitialized) return;
+
+    // Skip native notification setup on web
+    if (kIsWeb) {
+      debugPrint('[Notification] Running on Web - skipping native notifications');
+      _isInitialized = true;
+      _setupRealtimeSubscription();
+      return;
+    }
 
     tz.initializeTimeZones();
 
@@ -148,6 +157,12 @@ class NotificationService {
 
   /// Show push notification on device
   Future<void> _showPushNotification(AppNotification notification) async {
+    // Skip on web
+    if (kIsWeb) {
+      debugPrint('[Notification] Web: In-app notification displayed instead');
+      return;
+    }
+    
     final androidDetails = AndroidNotificationDetails(
       'psgmx_channel_main',
       'PSGMX Notifications',
@@ -480,6 +495,10 @@ class NotificationService {
     required String teamId,
   }) async {
     if (!isTeamLeader) return;
+    if (kIsWeb) {
+      debugPrint('[Notification] Web: Scheduled notifications not available');
+      return;
+    }
 
     // Schedule daily reminder at 4:45 PM
     await _scheduleDaily(
@@ -498,6 +517,11 @@ class NotificationService {
 
   /// Cancel attendance reminders
   Future<void> cancelAttendanceReminder(String teamId) async {
+    if (kIsWeb) {
+      debugPrint('[Notification] Web: Scheduled notifications not available');
+      return;
+    }
+    
     await _notifications.cancel(300 + teamId.hashCode % 100);
   }
 
@@ -525,6 +549,7 @@ class NotificationService {
   }
 
   Future<void> cancelLeetCodeReminders() async {
+    if (kIsWeb) return;
     await _notifications.cancel(100);
     await _notifications.cancel(101);
   }
@@ -537,6 +562,11 @@ class NotificationService {
   }) async {
     if (!enabled) {
       await cancelBirthdayNotification();
+      return false;
+    }
+    
+    if (kIsWeb) {
+      debugPrint('[Notification] Web: Scheduled notifications not available');
       return false;
     }
 
@@ -583,6 +613,7 @@ class NotificationService {
   }
 
   Future<void> cancelBirthdayNotification() async {
+    if (kIsWeb) return;
     await _notifications.cancel(200);
   }
 
@@ -594,6 +625,8 @@ class NotificationService {
     required int minute,
     String channel = 'psgmx_leetcode',
   }) async {
+    if (kIsWeb) return;
+    
     final now = tz.TZDateTime.now(tz.local);
     var scheduledDate =
         tz.TZDateTime(tz.local, now.year, now.month, now.day, hour, minute);
@@ -630,6 +663,8 @@ class NotificationService {
     required int hour,
     required int minute,
   }) async {
+    if (kIsWeb) return;
+    
     var date = tz.TZDateTime.now(tz.local);
     while (date.weekday != day) {
       date = date.add(const Duration(days: 1));
@@ -660,6 +695,11 @@ class NotificationService {
   }
 
   Future<bool> requestPermissions() async {
+    if (kIsWeb) {
+      debugPrint('[Notification] Web: Permissions not required');
+      return true;
+    }
+    
     if (await Permission.notification.isGranted) return true;
 
     final status = await Permission.notification.request();
@@ -686,6 +726,11 @@ class NotificationService {
     NotificationType type = NotificationType.announcement,
     String channel = 'psgmx_channel_main',
   }) async {
+    if (kIsWeb) {
+      debugPrint('[Notification] Web: $title - $body');
+      return;
+    }
+    
     final androidDetails = AndroidNotificationDetails(
       channel,
       'PSGMX Notifications',
@@ -733,6 +778,7 @@ class NotificationService {
   }
 
   Future<void> cancelAll() async {
+    if (kIsWeb) return;
     await _notifications.cancelAll();
   }
 

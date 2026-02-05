@@ -85,20 +85,29 @@ class UserProvider with ChangeNotifier {
   void _listenToAuthStateChanges() {
     _authService.authStateChanges.listen(
       (AuthState authState) async {
+        debugPrint('[UserProvider] Auth state changed: ${authState.event}');
         final supabaseUser = authState.session?.user;
+        
         if (supabaseUser != null) {
+          debugPrint('[UserProvider] User logged in: ${supabaseUser.email}');
           try {
             _currentUser = await _authService.getUserProfile(supabaseUser.id);
             if (_currentUser != null) {
+              debugPrint('[UserProvider] ✅ Profile loaded: ${_currentUser!.name}');
               _scheduleBirthdayNotificationIfNeeded();
+            } else {
+              debugPrint('[UserProvider] ⚠️ Profile is null after fetch');
             }
           } catch (e) {
+            debugPrint('[UserProvider] ❌ Error fetching profile: $e');
             _currentUser = null;
           }
         } else {
+          debugPrint('[UserProvider] User logged out');
           _currentUser = null;
         }
         notifyListeners();
+        debugPrint('[UserProvider] notifyListeners() called, currentUser: ${_currentUser?.email}');
       },
       onError: (e) {
         debugPrint('[UserProvider] Auth stream error: $e');
