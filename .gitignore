@@ -110,7 +110,6 @@ scripts/service-account.json
 # Generated files
 **/.generated/
 **/*.g.dart
-lib/generated_plugin_registrant.dart
 
 # Misc
 .DS_Store

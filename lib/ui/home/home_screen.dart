@@ -14,6 +14,7 @@ import '../../models/attendance_streak.dart';
 import '../../core/theme/app_dimens.dart';
 import '../widgets/premium_card.dart';
 import '../widgets/notification_bell_icon.dart';
+import '../widgets/ios_install_guide.dart';
 import 'widgets/leetcode_card.dart';
 import 'widgets/leetcode_leaderboard.dart';
 import 'widgets/attendance_action_card.dart';
@@ -443,7 +444,10 @@ class _HomeScreenState extends State<HomeScreen> {
                   _buildWelcomeHeader(context, user.name),
                   const SizedBox(height: AppSpacing.xl),
 
-                  // 2. Birthday Greeting (if today is birthday)
+                  // 2. iOS PWA Installation Guide (iOS Safari only)
+                  const IOSInstallGuide(),
+
+                  // 3. Birthday Greeting (if today is birthday)
                   if (_isBirthday(user.dob)) ...[
                     BirthdayGreetingCard(userName: user.name),
                     const SizedBox(height: AppSpacing.xl),
