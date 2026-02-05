@@ -1,4 +1,4 @@
-import 'package:flutter/foundation.dart';
+import 'package:flutter/widgets.dart';
 import '../models/announcement.dart';
 import '../services/supabase_service.dart';
 
