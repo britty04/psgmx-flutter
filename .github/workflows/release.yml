@@ -4,9 +4,12 @@ on:
   workflow_dispatch:  # Manual trigger
     inputs:
       version:
-        description: 'Version tag (e.g., v2.1.0)'
+        description: 'Version tag (e.g., v2.2.0)'
         required: false
         default: 'latest'
+  push:
+    tags:
+      - 'v*'  # Trigger on version tags
 
 permissions:
   contents: write
