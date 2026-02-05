@@ -1,7 +1,5 @@
-# Firebase
-.firebase/
-firebase-debug.log
-firebaserc
-
-# Build
-build/
+{
+  "projects": {
+    "default": "psgmxians"
+  }
+}
