@@ -1,12 +1,10 @@
 name: Build and Release
 
 on:
-  workflow_dispatch:
+  workflow_dispatch:  # Only manual trigger
   push:
-    branches:
-      - main  # Run on every push to main to check for new versions
     tags:
-      - "v*"
+      - "v*"  # Or when a version tag is pushed
 
 permissions:
   contents: write
