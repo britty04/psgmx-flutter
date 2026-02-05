@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/user_provider.dart';
+import '../core/utils/responsive_helper.dart';
 import 'home/home_screen.dart';
 import 'tasks/tasks_screen.dart';
 import 'attendance/comprehensive_attendance_screen.dart';
@@ -74,8 +75,32 @@ class _RootLayoutState extends State<RootLayout> {
       _currentIndex = 0;
     }
 
-    // Root Scaffolding (BottomNav Only)
-    // Child screens provide their own Scaffold + AppBar
+    // Use NavigationRail for desktop/tablet web, BottomNavigationBar for mobile
+    final useRail = ResponsiveHelper.isDesktop(context) || 
+                     (ResponsiveHelper.isWeb && ResponsiveHelper.isTablet(context));
+
+    if (useRail) {
+      return Scaffold(
+        body: Row(
+          children: [
+            NavigationRail(
+              selectedIndex: _currentIndex,
+              onDestinationSelected: (idx) => setState(() => _currentIndex = idx),
+              labelType: NavigationRailLabelType.all,
+              destinations: navItems.map((item) => NavigationRailDestination(
+                icon: item.icon,
+                selectedIcon: item.selectedIcon,
+                label: Text(item.label),
+              )).toList(),
+            ),
+            const VerticalDivider(thickness: 1, width: 1),
+            Expanded(child: screens[_currentIndex]),
+          ],
+        ),
+      );
+    }
+
+    // Mobile layout with bottom navigation
     return Scaffold(
       body: screens[_currentIndex],
       bottomNavigationBar: NavigationBar(

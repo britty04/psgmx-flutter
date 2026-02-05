@@ -50,13 +50,16 @@ class AuthService {
         throw Exception('Email not authorized. Please contact administrator.');
       }
 
-      // 3. Send OTP
+      // 3. Send OTP Token (6-digit code for existing users)
+      // shouldCreateUser: false because all users pre-exist in auth.users
+      // This forces Supabase to send OTP token, not signup confirmation link
       await _supabaseService.auth.signInWithOtp(
         email: email,
-        shouldCreateUser: true,
+        shouldCreateUser: false, // Users already exist - OTP only
       );
 
-      debugPrint('[AuthService] OTP sent successfully');
+      debugPrint('[AuthService] ✅ OTP (6-digit code) sent to $email');
+      debugPrint('[AuthService] User should receive OTP token in email');
       return true;
 
     } on AuthException catch (e) {
@@ -71,7 +74,7 @@ class AuthService {
     }
   }
 
-  /// STEP 2: VERIFY OTP
+  /// STEP 2: VERIFY OTP (Magic Link Token)
   Future<void> verifyOtp({
     required String email,
     required String otp,
@@ -85,6 +88,7 @@ class AuthService {
 
       debugPrint('[AuthService] Verifying OTP for $email');
 
+      // Verify OTP with Supabase (using magic link token)
       final response = await _supabaseService.auth.verifyOTP(
         email: email,
         token: otp,
@@ -92,19 +96,38 @@ class AuthService {
       );
 
       if (response.session == null) {
-        throw 'Verification failed';
+        throw 'Verification failed. Please try again.';
       }
 
-      // Check if we need to create user profile
       final user = response.user;
-      if (user != null) {
-        await _ensureUserProfile(user.id, email);
+      if (user == null) {
+        throw 'User data not available.';
       }
+
+      debugPrint('[AuthService] ✅ OTP verified successfully');
+      debugPrint('[AuthService] User authenticated: ${user.email}');
+
+      // Ensure user profile exists (non-blocking)
+      // Database trigger should auto-create profile, this is just backup
+      try {
+        await _ensureUserProfile(user.id, email);
+        debugPrint('[AuthService] ✅ Profile verified/created');
+      } catch (e) {
+        // Silently handle - profile likely exists from trigger
+        debugPrint('[AuthService] Profile check completed: $e');
+        // Don't throw - auth is successful, profile exists
+      }
+
+      debugPrint('[AuthService] ✅ Login complete for: $email');
 
     } on AuthException catch (e) {
-      debugPrint('[AuthService] Verify Error: ${e.message}');
-      throw 'Invalid OTP or expired.';
+      debugPrint('[AuthService] Auth error: ${e.message}');
+      if (e.message.contains('Invalid') || e.message.contains('expired')) {
+        throw 'Invalid or expired OTP. Please request a new one.';
+      }
+      throw e.message;
     } catch (e) {
+      debugPrint('[AuthService] Unexpected error: $e');
       throw e.toString();
     }
   }
@@ -112,57 +135,210 @@ class AuthService {
   /// Internal: Create user profile if it doesn't exist
   Future<void> _ensureUserProfile(String userId, String email) async {
     try {
-      final existingProfile = await getUserProfile(userId);
-      if (existingProfile != null) return;
+      debugPrint('[AuthService] Checking if profile exists for $userId...');
+      
+      // Check if user already exists by ID
+      final existingProfileById = await getUserProfile(userId);
+      if (existingProfileById != null) {
+        debugPrint('[AuthService] ✅ Profile already exists (by ID).');
+        return;
+      }
 
-      debugPrint('[AuthService] Creating new user profile from whitelist...');
+      // Also check by email (in case trigger created it)
+      final existingProfileByEmail = await _supabaseService.client
+          .from('users')
+          .select()
+          .eq('email', email)
+          .maybeSingle();
+      
+      if (existingProfileByEmail != null) {
+        debugPrint('[AuthService] ✅ Profile already exists (by email). Trigger created it.');
+        return;
+      }
+
+      debugPrint('[AuthService] Profile does not exist. Fetching from whitelist...');
       
       // Fetch whitelist data
       final whitelistData = await _supabaseService.client
           .from('whitelist')
           .select()
           .eq('email', email)
-          .single();
+          .maybeSingle();
 
-      // Create user
+      if (whitelistData == null) {
+        debugPrint('[AuthService] ⚠️ User not found in whitelist: $email');
+        debugPrint('[AuthService] Creating profile with defaults...');
+        
+        // Create minimal profile if not in whitelist (fallback)
+        await _createMinimalProfile(userId, email);
+        return;
+      }
+
+      debugPrint('[AuthService] Whitelist data found: ${whitelistData.toString()}');
+
+      // Parse roles safely
+      dynamic rolesData = whitelistData['roles'];
+      Map<String, dynamic> roles;
+      
+      if (rolesData == null) {
+        roles = {
+          'isStudent': true,
+          'isTeamLeader': false,
+          'isCoordinator': false,
+          'isPlacementRep': false,
+        };
+      } else if (rolesData is Map) {
+        roles = Map<String, dynamic>.from(rolesData);
+      } else {
+        roles = {
+          'isStudent': true,
+          'isTeamLeader': false,
+          'isCoordinator': false,
+          'isPlacementRep': false,
+        };
+      }
+
+      // Extract reg_no from email if not provided
+      String regNo = whitelistData['reg_no']?.toString() ?? 
+                     email.split('@')[0].toUpperCase();
+      
+      // Ensure reg_no is unique by checking if it already exists
+      final existingRegNo = await _supabaseService.client
+          .from('users')
+          .select('id')
+          .eq('reg_no', regNo)
+          .maybeSingle();
+      
+      if (existingRegNo != null && existingRegNo['id'] != userId) {
+        // Add a suffix to make it unique
+        regNo = '${regNo}_${userId.substring(0, 4)}';
+        debugPrint('[AuthService] Reg_no already exists, using: $regNo');
+      }
+
+      // Create user with proper null handling
       final userData = {
         'id': userId,
         'email': email,
-        'reg_no': whitelistData['reg_no'] ?? email.split('@')[0].toUpperCase(),
-        'name': whitelistData['name'] ?? 'Student',
-        'batch': whitelistData['batch'] ?? 'G1',
-        'team_id': whitelistData['team_id'],
-        'roles': whitelistData['roles'] ?? {
+        'reg_no': regNo,
+        'name': whitelistData['name']?.toString() ?? 'Student',
+        'batch': whitelistData['batch']?.toString() ?? 'G1',
+        'team_id': whitelistData['team_id']?.toString(),
+        'roles': roles,
+        'dob': whitelistData['dob']?.toString(),
+        'leetcode_username': whitelistData['leetcode_username']?.toString(),
+        'birthday_notifications_enabled': true,
+        'leetcode_notifications_enabled': true,
+      };
+
+      debugPrint('[AuthService] Creating profile for: ${userData['email']} - ${userData['name']}');
+      
+      try {
+        final result = await _supabaseService.client
+            .from('users')
+            .insert(userData)
+            .select()
+            .single();
+            
+        debugPrint('[AuthService] ✅ Profile created successfully: $result');
+      } on PostgrestException catch (e) {
+        // If duplicate key error, profile already exists (created by trigger)
+        if (e.code == '23505') {
+          debugPrint('[AuthService] ✅ Profile already exists (duplicate key). This is OK - trigger created it.');
+          return;
+        }
+        rethrow;
+      }
+      
+    } catch (e, stackTrace) {
+      // If it's a duplicate key error, that's actually success (profile exists)
+      if (e.toString().contains('duplicate') || 
+          e.toString().contains('unique') ||
+          e.toString().contains('23505')) {
+        debugPrint('[AuthService] ✅ Profile already exists (caught duplicate). Continuing...');
+        return; // Success - profile exists
+      }
+      
+      debugPrint('[AuthService] ❌ Error ensuring profile: $e');
+      debugPrint('[AuthService] Stack trace: $stackTrace');
+      
+      // Try to provide more specific error information
+      if (e.toString().contains('foreign key')) {
+        debugPrint('[AuthService] Foreign key constraint violation');
+      } else if (e.toString().contains('null value')) {
+        debugPrint('[AuthService] Null value in required field');
+      }
+      
+      rethrow;
+    }
+  }
+
+  /// Create minimal profile as fallback
+  Future<void> _createMinimalProfile(String userId, String email) async {
+    try {
+      final regNo = email.split('@')[0].toUpperCase();
+      
+      // Check if reg_no exists
+      final existingRegNo = await _supabaseService.client
+          .from('users')
+          .select('id')
+          .eq('reg_no', regNo)
+          .maybeSingle();
+      
+      String finalRegNo = regNo;
+      if (existingRegNo != null && existingRegNo['id'] != userId) {
+        finalRegNo = '${regNo}_${userId.substring(0, 4)}';
+      }
+
+      final userData = {
+        'id': userId,
+        'email': email,
+        'reg_no': finalRegNo,
+        'name': email.split('@')[0].toUpperCase(),
+        'batch': 'G1',
+        'team_id': null,
+        'roles': {
           'isStudent': true,
           'isTeamLeader': false,
           'isCoordinator': false,
           'isPlacementRep': false,
         },
-        'dob': whitelistData['dob'],
-        'leetcode_username': whitelistData['leetcode_username'],
         'birthday_notifications_enabled': true,
         'leetcode_notifications_enabled': true,
       };
 
-      await _supabaseService.client.from('users').insert(userData);
-      debugPrint('[AuthService] Profile created.');
+      await _supabaseService.client
+          .from('users')
+          .insert(userData)
+          .select()
+          .single();
+          
+      debugPrint('[AuthService] ✅ Minimal profile created');
     } catch (e) {
-      debugPrint('[AuthService] Error ensuring profile: $e');
+      debugPrint('[AuthService] ❌ Failed to create minimal profile: $e');
+      rethrow;
     }
   }
 
   /// Fetch user profile
   Future<AppUser?> getUserProfile(String userId) async {
     try {
+      debugPrint('[AuthService] Fetching profile for user ID: $userId');
+      
       final response = await _supabaseService.client
           .from('users')
           .select()
           .eq('id', userId)
           .maybeSingle();
 
-      if (response == null) return null;
+      if (response == null) {
+        debugPrint('[AuthService] ❌ No profile found for user ID: $userId');
+        return null;
+      }
+      
+      debugPrint('[AuthService] ✅ Profile found: ${response['email']} - ${response['name']}');
       return AppUser.fromJson(response);
     } catch (e) {
+      debugPrint('[AuthService] ❌ Error fetching profile: $e');
       return null;
     }
   }

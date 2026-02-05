@@ -1,6 +1,6 @@
-import 'dart:io';
+import 'dart:io' show Platform;
 
-import 'package:flutter/foundation.dart';
+import 'package:flutter/foundation.dart' show ChangeNotifier, debugPrint, kIsWeb;
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -190,12 +190,17 @@ class UpdateService extends ChangeNotifier {
 
     String? url;
     
-    // Platform-specific URLs if available
-    if (Platform.isAndroid && _config!.androidDownloadUrl != null) {
-      url = _config!.androidDownloadUrl;
-    } else if (Platform.isIOS && _config!.iosDownloadUrl != null) {
-      url = _config!.iosDownloadUrl;
-    } else {
+    // Platform-specific URLs if available (not on web)
+    if (!kIsWeb) {
+      if (Platform.isAndroid && _config!.androidDownloadUrl != null) {
+        url = _config!.androidDownloadUrl;
+      } else if (Platform.isIOS && _config!.iosDownloadUrl != null) {
+        url = _config!.iosDownloadUrl;
+      }
+    }
+    
+    // Fallback to GitHub releases
+    if (url == null || url.isEmpty) {
       url = _config!.githubReleaseUrl;
     }
 
