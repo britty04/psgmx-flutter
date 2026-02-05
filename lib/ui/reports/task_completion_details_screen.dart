@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:intl/intl.dart';
 import '../../core/theme/app_dimens.dart';
 import '../../models/task_completion.dart';
 import '../../services/task_completion_service.dart';

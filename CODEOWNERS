@@ -1,0 +1,22 @@
+# Code Owners for PSGMX Flutter Project
+# These owners will be requested for review when someone opens a pull request.
+
+# Default owner for everything in the repo
+* @brittytino
+
+# Core application logic
+/lib/core/ @brittytino
+/lib/services/ @brittytino
+/lib/providers/ @brittytino
+
+# Database and backend
+/database/ @brittytino
+
+# Documentation
+*.md @brittytino
+/docs/ @brittytino
+
+# Configuration files
+*.yaml @brittytino
+*.json @brittytino
+/.github/ @brittytino

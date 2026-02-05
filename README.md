@@ -39,7 +39,7 @@
 
 ### 1. Clone Repository
 ```bash
-git clone https://github.com/your-username/psgmx-flutter.git
+git clone https://github.com/brittytino/psgmx-flutter.git
 cd psgmx-flutter
 ```
 
@@ -239,6 +239,15 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ---
 
+## �‍💻 Author
+
+**Tino Britty J**
+- GitHub: [@brittytino](https://github.com/brittytino)
+- Portfolio: [tinobritty.me](https://tinobritty.me)
+- Project: [PSGMX Flutter](https://github.com/brittytino/psgmx-flutter)
+
+---
+
 ## 🙏 Acknowledgments
 
 - PSG College of Technology - MCA Department
@@ -249,9 +258,9 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ## 📞 Support
 
-- **Issues**: [GitHub Issues](https://github.com/your-username/psgmx-flutter/issues)
-- **Email**: support@psgmx.com
-- **Documentation**: [Wiki](https://github.com/your-username/psgmx-flutter/wiki)
+- **Issues**: [GitHub Issues](https://github.com/brittytino/psgmx-flutter/issues)
+- **Live Demo**: [https://psgmxians.web.app](https://psgmxians.web.app)
+- **Documentation**: [Project Wiki](https://github.com/brittytino/psgmx-flutter/wiki)
 
 ---
 
@@ -269,4 +278,4 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ---
 
-**Made with ❤️ by PSG MCA Batch 2025-2027**
+**Made with ❤️ for PSG MCA by [Tino Britty J](https://tinobritty.me)**

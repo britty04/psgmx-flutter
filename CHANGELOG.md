@@ -2,6 +2,45 @@
 
 All notable changes to PSG MCA Placement Prep App will be documented in this file.
 
+## [2.1.0] - 2026-02-05
+
+### 🎉 Production Release - Open Source Ready
+
+#### ✨ New Features
+- **iOS PWA Installation Guide**: Professional step-by-step guide for iOS users to install as Progressive Web App
+- **Smart Platform Detection**: Auto-detects iOS Safari and shows installation guide only when needed
+- **Firebase Hosting Deployment**: Fully automated deployment pipeline with GitHub Actions
+- **Android APK Signing**: Production-ready signed APKs for direct distribution
+
+#### 🏗️ Infrastructure
+- Cleaned up duplicate GitHub Actions workflows
+- Optimized Firebase deployment with proper Flutter setup
+- Added proper keystore management for Android releases
+- Automated deployment on every push to main branch
+- Live deployment: [https://psgmxians.web.app](https://psgmxians.web.app)
+
+#### 🐛 Bug Fixes
+- Removed unused imports and dead code
+- Fixed null safety issues in update service
+- Cleaned up unused methods and fields
+- Optimized codebase for production
+
+#### 📚 Documentation
+- Added comprehensive author attribution
+- Updated README with proper GitHub links
+- Created CODEOWNERS file for maintainability
+- Added detailed setup guides for contributors
+- Included deployment documentation
+
+#### 🎨 Code Quality
+- Passed all Dart analysis checks
+- Removed unused declarations
+- Optimized imports and dependencies
+- Enhanced code documentation
+- Clean architecture ready for open source contributions
+
+---
+
 ## [1.0.5] - 2026-01-28
 
 ### Production Release - All Critical Issues Fixed

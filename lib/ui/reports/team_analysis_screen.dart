@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import '../../core/theme/app_dimens.dart';
 import '../../services/attendance_service.dart';
 import 'team_details_screen.dart';
 

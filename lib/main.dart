@@ -1,3 +1,16 @@
+/// PSGMX - Placement Excellence Program
+/// 
+/// A comprehensive placement preparation platform for PSG Technology - MCA
+/// 
+/// Author: Tino Britty J
+/// GitHub: https://github.com/brittytino
+/// Portfolio: https://tinobritty.me
+/// 
+/// Copyright (c) 2026 Tino Britty J
+/// Licensed under the MIT License
+
+library;
+
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';

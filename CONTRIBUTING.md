@@ -1,12 +1,18 @@
-# Contributing to PSG MCA Placement Prep App
+# Contributing to PSGMX - Placement Excellence Program
 
 Thank you for your interest in contributing! This guide will help you get started.
+
+## 👨‍💻 Project Maintainer
+
+**Tino Britty J**
+- GitHub: [@brittytino](https://github.com/brittytino)
+- Portfolio: [tinobritty.me](https://tinobritty.me)
 
 ## Getting Started
 
 1. **Fork the Repository**
    ```bash
-   git clone https://github.com/yourusername/psgmx-flutter.git
+   git clone https://github.com/brittytino/psgmx-flutter.git
    cd psgmx-flutter
    ```
 

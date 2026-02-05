@@ -18,7 +18,6 @@ class SettingsScreen extends StatefulWidget {
 
 class _SettingsScreenState extends State<SettingsScreen> {
   bool _isSaving = false;
-  bool _isLoggingOut = false;
   String _appVersion = '';
 
   @override
@@ -256,13 +255,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
 
     if (confirmed == true && mounted) {
-      setState(() => _isLoggingOut = true);
+      setState(() => _isSaving = true);
       try {
         await provider.signOut();
         // Navigation will be handled by the auth state listener
       } catch (e) {
         if (mounted) {
-          setState(() => _isLoggingOut = false);
+          setState(() => _isSaving = false);
           if (context.mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(content: Text('Error signing out: $e')),
