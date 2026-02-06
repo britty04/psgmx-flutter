@@ -1,7 +1,7 @@
 name: Build and Release Android APK
 
 on:
-  workflow_dispatch:  # Manual trigger
+  workflow_dispatch:
     inputs:
       version:
         description: 'Version tag (e.g., v2.2.0)'
@@ -9,7 +9,7 @@ on:
         default: 'latest'
   push:
     tags:
-      - 'v*'  # Trigger on version tags
+      - 'v*'
 
 permissions:
   contents: write
@@ -18,6 +18,7 @@ jobs:
   build_and_release:
     name: Build and Release APK
     runs-on: ubuntu-latest
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -33,22 +34,22 @@ jobs:
       - name: Setup Java
         uses: actions/setup-java@v4
         with:
-          distribution: "temurin"
-          java-version: "17"
+          distribution: temurin
+          java-version: '17'
 
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
         with:
-          channel: "stable"
+          channel: stable
           cache: true
-          cache-key: 'flutter-:os:-:channel:-:version:-:arch:-:hash:'
-          cache-path: '${{ runner.tool_cache }}/flutter/:channel:-:version:-:arch:'
+
+      - name: Flutter Doctor
+        run: flutter doctor -v
 
       - name: Install dependencies
         run: |
           flutter pub get
           flutter precache --android
-          chmod +x android/gradlew
 
       - name: Setup Keystore
         env:
@@ -58,14 +59,13 @@ jobs:
           KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
         run: |
           echo "$KEYSTORE_BASE64" | base64 -d > android/app/upload-keystore.jks
-          ls -lh android/app/upload-keystore.jks
-          cat > android/key.properties << 'EOF'
-          storePassword=${{ secrets.KEYSTORE_PASSWORD }}
-          keyPassword=${{ secrets.KEY_PASSWORD }}
-          keyAlias=${{ secrets.KEY_ALIAS }}
+
+          cat > android/key.properties <<EOF
+          storePassword=${KEYSTORE_PASSWORD}
+          keyPassword=${KEY_PASSWORD}
+          keyAlias=${KEY_ALIAS}
           storeFile=app/upload-keystore.jks
           EOF
-          cat android/key.properties
 
       - name: Build Signed APK
         timeout-minutes: 60
@@ -79,37 +79,28 @@ jobs:
           mv build/app/outputs/flutter-apk/app-release.apk \
              build/app/outputs/flutter-apk/PSGMX-${{ steps.version.outputs.TAG }}-android.apk
 
-      - name: Create Release
+      - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ steps.version.outputs.TAG }}
           name: PSGMX ${{ steps.version.outputs.TAG }}
           body: |
             ## 📱 PSGMX Release ${{ steps.version.outputs.TAG }}
-            
+
             ### 📥 Download
             - **Android APK**: `PSGMX-${{ steps.version.outputs.TAG }}-android.apk`
-            
-            ### 📋 Installation Instructions
-            
-            **Android:**
-            1. Download the APK file below
-            2. Enable "Install from unknown sources" in Settings
-            3. Open the APK file to install
-            
+
+            ### 📋 Installation
+            1. Download APK
+            2. Enable "Install unknown apps"
+            3. Install & enjoy 🚀
+
             ### 🌐 Web App
-            Live at: [https://psgmxians.web.app](https://psgmxians.web.app)
-            
-            ### 📝 What's New
-            Check [CHANGELOG.md](https://github.com/brittytino/psgmx-flutter/blob/main/CHANGELOG.md) for details
-            
-            ---
-            **Author**: Tino Britty J | [Portfolio](https://tinobritty.me) | [GitHub](https://github.com/brittytino)
+            https://psgmxians.web.app
           files: |
             build/app/outputs/flutter-apk/PSGMX-${{ steps.version.outputs.TAG }}-android.apk
           draft: false
           prerelease: false
           make_latest: true
-          generate_release_notes: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
