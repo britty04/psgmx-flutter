@@ -152,29 +152,37 @@ class _LongAbsenteesScreenState extends State<LongAbsenteesScreen> {
                             const SizedBox(width: AppSpacing.md),
                             Text(
                               'Absent for at least:',
-                              style: GoogleFonts.inter(fontSize: 12),
-                            ),
-                            const SizedBox(width: AppSpacing.md),
-                            DropdownButton<int>(
-                              value: _absentDaysFilter,
-                              underline: const SizedBox(),
-                              items: [3, 5, 7, 10, 14].map((days) {
-                                return DropdownMenuItem(
-                                  value: days,
-                                  child: Text('$days days'),
-                                );
-                              }).toList(),
-                              onChanged: (value) {
-                                if (value != null) {
-                                  setState(() => _absentDaysFilter = value);
-                                  _loadAbsentees();
-                                }
-                              },
+                              style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w500),
                             ),
                           ],
                         ),
                       ),
                     ),
+                    
+                    // Filter Segments
+                    SingleChildScrollView(
+                      scrollDirection: Axis.horizontal,
+                      padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg),
+                      child: SegmentedButton<int>(
+                        segments: const [
+                          ButtonSegment(value: 3, label: Text('3d')),
+                          ButtonSegment(value: 5, label: Text('5d')),
+                          ButtonSegment(value: 7, label: Text('7d')),
+                          ButtonSegment(value: 10, label: Text('10d')),
+                          ButtonSegment(value: 14, label: Text('14d')),
+                        ],
+                        selected: {_absentDaysFilter},
+                        onSelectionChanged: (newSelection) {
+                          setState(() => _absentDaysFilter = newSelection.first);
+                          _loadAbsentees();
+                        },
+                        style: const ButtonStyle(
+                          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                          visualDensity: VisualDensity.compact,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: AppSpacing.md),
 
                     // List
                     Expanded(

@@ -87,7 +87,7 @@ class PerformanceService {
         return;
       }
 
-      // Send notification
+      // Send notification (persist to DB for in-app viewing)
       await _notificationService.showNotification(
         id: 901,
         title: '🏆 Weekly Champion!',
@@ -95,6 +95,7 @@ class PerformanceService {
             'This week\'s top solver: ${topPerformer.name} with ${topPerformer.weeklyScore} problems solved! Keep pushing! 💪',
         type: NotificationType.motivation,
         channel: 'psgmx_channel_main',
+        persistToDatabase: true, // Production-grade: Save to DB
       );
 
       // Store in database as announcement for in-app banner
@@ -222,7 +223,7 @@ class PerformanceService {
   /// Announce milestone achievement via notification
   Future<void> announceMilestone(MilestoneAchievement achievement) async {
     try {
-      // Local notification for the user
+      // Local notification for the user (persist to DB)
       await _notificationService.showNotification(
         id: 902 + achievement.milestone,
         title: '🎉 Milestone Reached!',
@@ -230,6 +231,7 @@ class PerformanceService {
             'Congratulations! You\'ve solved ${achievement.milestone} problems on LeetCode! Keep going! 🚀',
         type: NotificationType.motivation,
         channel: 'psgmx_channel_main',
+        persistToDatabase: true, // Production-grade: Save to DB
       );
 
       // Create announcement in database for everyone to see
@@ -257,6 +259,38 @@ class PerformanceService {
     final achievement = await checkMilestoneAchieved(userId);
     if (achievement != null) {
       await announceMilestone(achievement);
+    }
+  }
+
+  /// Check milestones for ALL users (called after LeetCode refresh)
+  Future<void> checkAndAnnounceAllUsersMilestones() async {
+    try {
+      debugPrint('[PerformanceService] Checking milestones for all users...');
+      
+      // Get all users with LeetCode usernames
+      final usersResponse = await _supabase
+          .from('users')
+          .select('id, name, leetcode_username')
+          .not('leetcode_username', 'is', null);
+
+      int milestonesFound = 0;
+      for (var user in usersResponse as List) {
+        final userId = user['id'] as String;
+        final achievement = await checkMilestoneAchieved(userId);
+        
+        if (achievement != null) {
+          await announceMilestone(achievement);
+          milestonesFound++;
+        }
+      }
+      
+      if (milestonesFound > 0) {
+        debugPrint('[PerformanceService] ✅ Found and announced $milestonesFound milestone(s)');
+      } else {
+        debugPrint('[PerformanceService] No new milestones detected');
+      }
+    } catch (e) {
+      debugPrint('[PerformanceService] Error checking all user milestones: $e');
     }
   }
 

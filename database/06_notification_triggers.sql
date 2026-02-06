@@ -78,7 +78,7 @@ DECLARE
     milestone INT := 50; -- Notify every 50 problems
     old_milestone INT;
     new_milestone INT;
-    user_name TEXT;
+    display_name TEXT;
 BEGIN
     -- Calculate milestones (integer division)
     old_milestone := OLD.total_solved / milestone;
@@ -86,9 +86,16 @@ BEGIN
 
     -- If moved to a new milestone bracket (e.g., 49 -> 50)
     IF new_milestone > old_milestone THEN
-        -- Get user details if possible (assuming username is the key)
-        -- Note: leetcode_stats uses 'username' which might not directly link to a specific user UUID easily if not consistent
-        -- But for a general announcement, we can just use the username.
+        -- Get user's real name from users table (joining on leetcode_username)
+        SELECT name INTO display_name
+        FROM users
+        WHERE leetcode_username = NEW.username
+        LIMIT 1;
+
+        -- Fallback to username if real name not found
+        IF display_name IS NULL THEN
+            display_name := NEW.username;
+        END IF;
         
         INSERT INTO notifications (
             title,
@@ -99,7 +106,7 @@ BEGIN
             created_by
         ) VALUES (
             '🏆 New Milestone Reached!',
-            NEW.username || ' has just solved ' || NEW.total_solved || ' problems! Keep it up!',
+            display_name || ' has just solved ' || NEW.total_solved || ' problems! Keep it up!',
             'motivation',
             'friendly',
             'all',

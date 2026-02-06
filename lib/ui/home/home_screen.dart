@@ -43,7 +43,47 @@ class _HomeScreenState extends State<HomeScreen> {
       NotificationService().init(); // Ensure notification init
       NotificationService().requestPermissions();
       _checkAttendancePopup();
+      _checkWeeklyTopPerformer(); // C1: Weekly top performer check
+      _setupDailyReminders(); // Setup all scheduled reminders
     });
+  }
+
+  /// C1: Check and announce weekly top performer (Mondays only)
+  Future<void> _checkWeeklyTopPerformer() async {
+    try {
+      final performanceService = PerformanceService();
+      final shouldAnnounce = await performanceService.shouldAnnounceWeeklyTopPerformer();
+      if (shouldAnnounce) {
+        await performanceService.announceWeeklyTopPerformer();
+      }
+    } catch (e) {
+      // Silent fail - not critical
+      debugPrint('[HomeScreen] Error checking weekly top performer: $e');
+    }
+  }
+
+  /// Setup all daily scheduled reminders
+  Future<void> _setupDailyReminders() async {
+    try {
+      final notifService = NotificationService();
+      final userProvider = context.read<UserProvider>();
+      
+      // Schedule task deadline reminder (9 PM daily)
+      await notifService.scheduleTaskDeadlineReminder();
+      
+      // Schedule attendance reminder for team leaders
+      if (userProvider.isTeamLeader && userProvider.currentUser?.teamId != null) {
+        await notifService.scheduleAttendanceReminder(
+          isTeamLeader: true,
+          teamId: userProvider.currentUser!.teamId!,
+        );
+      }
+      
+      // Schedule LeetCode reminders
+      await notifService.scheduleLeetCodeReminders();
+    } catch (e) {
+      debugPrint('[HomeScreen] Error setting up reminders: $e');
+    }
   }
 
   Future<void> _refreshAll() async {
@@ -668,11 +708,12 @@ class _StudentDashboardState extends State<_StudentDashboard> {
         const SizedBox(height: AppSpacing.xl),
 
         _SectionHeader(
-            title: 'Your Progress',
-            action: 'History',
-            onTap: () {
-              context.read<NavigationProvider>().setIndex(2);
-            }),
+          title: 'Your Progress',
+          action: 'History',
+          onTap: () {
+            context.read<NavigationProvider>().setIndex(2);
+          },
+        ),
         const SizedBox(height: AppSpacing.md),
 
         // A3 & A4: Real attendance stats
@@ -940,7 +981,16 @@ class _AdminDashboard extends StatelessWidget {
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            _SectionHeader(title: 'Overview', action: 'Reports', onTap: () {}),
+            _SectionHeader(
+              title: 'Overview', 
+              action: 'Reports',
+              isPlacementRep: Provider.of<UserProvider>(context).isPlacementRep,
+              onTap: () {
+                if (Provider.of<UserProvider>(context, listen: false).isPlacementRep) {
+                  context.read<NavigationProvider>().setIndex(2);
+                }
+              },
+            ),
             const SizedBox(height: AppSpacing.md),
             Row(
               children: [
@@ -992,10 +1042,15 @@ class _AdminDashboard extends StatelessWidget {
 class _SectionHeader extends StatelessWidget {
   final String title;
   final String action;
+  final bool isPlacementRep;
   final VoidCallback onTap;
 
-  const _SectionHeader(
-      {required this.title, required this.action, required this.onTap});
+  const _SectionHeader({
+    required this.title, 
+    required this.action, 
+    this.isPlacementRep = false,
+    required this.onTap,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -1008,10 +1063,16 @@ class _SectionHeader extends StatelessWidget {
                 fontWeight: FontWeight.bold,
               ),
         ),
-        TextButton(
-          onPressed: onTap,
-          child: Text(action),
-        ),
+        if (isPlacementRep)
+          TextButton(
+            onPressed: onTap,
+            style: TextButton.styleFrom(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 0),
+              minimumSize: const Size(0, 0),
+              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+            ),
+            child: Text(action),
+          ),
       ],
     );
   }

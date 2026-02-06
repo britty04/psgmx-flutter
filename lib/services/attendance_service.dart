@@ -15,7 +15,7 @@ class AttendanceService {
     try {
       final dateString = date.toIso8601String().split('T')[0];
       final response = await _supabase
-          .from('attendance_days')
+          .from('scheduled_attendance_dates')
           .select()
           .eq('date', dateString)
           .maybeSingle();
@@ -29,36 +29,7 @@ class AttendanceService {
 
   Future<bool> isWorkingDay(DateTime date) async {
     final attendanceDay = await getAttendanceDay(date);
-    // 1. DB Override takes precedence
-    if (attendanceDay != null) return attendanceDay.isWorkingDay;
-    
-    // 2. Default Business Logic (Mon, Tue, Thu, Odd Sat)
-    return _isDefaultClassDay(date);
-  }
-  
-  bool _isDefaultClassDay(DateTime date) {
-      final weekday = date.weekday; // 1 = Mon, 7 = Sun
-      
-      // Mon (1), Tue (2), Thu (4)
-      if (weekday == DateTime.monday || weekday == DateTime.tuesday || weekday == DateTime.thursday) {
-        return true;
-      }
-      
-      // Odd Saturdays ONLY
-      if (weekday == DateTime.saturday) {
-          // 1st Sat: 1-7
-          // 2nd Sat: 8-14
-          // 3rd Sat: 15-21
-          // 4th Sat: 22-28
-          // 5th Sat: 29-31
-          final day = date.day;
-          if (day <= 7) return true; // 1st
-          if (day >= 15 && day <= 21) return true; // 3rd
-          if (day >= 29) return true; // 5th
-          return false; // 2nd, 4th
-      }
-      
-      return false; // Wed (3), Fri (5), Sun (7)
+    return attendanceDay?.isWorkingDay ?? false;
   }
 
   Future<List<AttendanceDay>> getAttendanceDaysInRange({
@@ -70,7 +41,7 @@ class AttendanceService {
       final endString = endDate.toIso8601String().split('T')[0];
 
       final response = await _supabase
-          .from('attendance_days')
+          .from('scheduled_attendance_dates')
           .select()
           .gte('date', startString)
           .lte('date', endString)
@@ -84,6 +55,29 @@ class AttendanceService {
     }
   }
 
+  Future<List<DateTime>> getWorkingDaysWithinRange({
+    required DateTime startDate,
+    required DateTime endDate,
+  }) async {
+    if (endDate.isBefore(startDate)) {
+      throw Exception('End date cannot be earlier than start date');
+    }
+
+    final normalizedStart =
+        DateTime(startDate.year, startDate.month, startDate.day);
+    final normalizedEnd = DateTime(endDate.year, endDate.month, endDate.day);
+
+    final days = await getAttendanceDaysInRange(
+      startDate: normalizedStart,
+      endDate: normalizedEnd,
+    );
+
+    return days
+        .where((day) => day.isWorkingDay)
+        .map((day) => DateTime(day.date.year, day.date.month, day.date.day))
+        .toList();
+  }
+
   Future<void> setWorkingDay({
     required DateTime date,
     required bool isWorkingDay,
@@ -92,12 +86,12 @@ class AttendanceService {
   }) async {
     try {
       final dateString = date.toIso8601String().split('T')[0];
-      
+
       await _supabase.from('scheduled_attendance_dates').upsert({
         'date': dateString,
         'is_working_day': isWorkingDay,
-        'decided_by': decidedBy,
-        'reason': reason,
+        'scheduled_by': decidedBy,
+        'notes': reason,
         'updated_at': DateTime.now().toIso8601String(),
       });
 
@@ -108,7 +102,7 @@ class AttendanceService {
         isWorkingDay: isWorkingDay,
         reason: reason,
       );
-      
+
       await _createAuditLog(auditLog);
     } catch (e) {
       throw Exception('Failed to set working day: ${e.toString()}');
@@ -127,8 +121,8 @@ class AttendanceService {
         return {
           'date': dateString,
           'is_working_day': isWorkingDay,
-          'decided_by': decidedBy,
-          'reason': reason,
+          'scheduled_by': decidedBy,
+          'notes': reason,
           'updated_at': DateTime.now().toIso8601String(),
         };
       }).toList();
@@ -165,7 +159,6 @@ class AttendanceService {
           'team_id': entry['team_id'],
           'status': entry['status'],
           'marked_by': markedBy,
-          'marked_at': now,
           'updated_at': now,
         };
       }).toList();
@@ -263,7 +256,44 @@ class AttendanceService {
           .maybeSingle();
 
       if (response == null) {
-        return null;
+        // Fallback: Calculate manually if view returns null (e.g. user not in view filter)
+        final userResponse = await _supabase
+            .from('users')
+            .select()
+            .eq('id', studentId)
+            .maybeSingle();
+
+        if (userResponse == null) return null;
+
+        final records = await _supabase
+            .from('attendance_records')
+            .select('status')
+            .eq('user_id', studentId);
+
+        int present = 0;
+        int absent = 0;
+
+        for (final record in (records as List)) {
+          final status = record['status'];
+          if (status == 'PRESENT') present++;
+          if (status == 'ABSENT') absent++;
+        }
+
+        final total = present + absent;
+        final percentage = total == 0 ? 0.0 : (present / total) * 100;
+
+        return AttendanceSummary(
+          studentId: userResponse['id'],
+          email: userResponse['email'] ?? '',
+          regNo: userResponse['reg_no'] ?? '',
+          name: userResponse['name'] ?? '',
+          teamId: userResponse['team_id'],
+          batch: userResponse['batch'] ?? 'G1',
+          presentCount: present,
+          absentCount: absent,
+          totalWorkingDays: total,
+          attendancePercentage: double.parse(percentage.toStringAsFixed(1)),
+        );
       }
 
       return AttendanceSummary.fromMap(response);
@@ -308,12 +338,11 @@ class AttendanceService {
   /// Get all teams attendance summary with ranking
   Future<List<Map<String, dynamic>>> getAllTeamsAttendanceSummary() async {
     try {
-      final response = await _supabase
-          .from('student_attendance_summary')
-          .select();
+      final response =
+          await _supabase.from('student_attendance_summary').select();
 
       final data = response as List;
-      
+
       // Group by team_id
       final Map<String, List<AttendanceSummary>> teamGroups = {};
       for (var item in data) {
@@ -344,9 +373,8 @@ class AttendanceService {
       }
 
       // Sort by average percentage (highest first)
-      teamSummaries.sort((a, b) => 
-        (b['average_percentage'] as double).compareTo(a['average_percentage'] as double)
-      );
+      teamSummaries.sort((a, b) => (b['average_percentage'] as double)
+          .compareTo(a['average_percentage'] as double));
 
       return teamSummaries;
     } catch (e) {
@@ -356,12 +384,11 @@ class AttendanceService {
 
   Future<Map<String, double>> getBatchAttendanceSummary() async {
     try {
-      final response = await _supabase
-          .from('student_attendance_summary')
-          .select();
+      final response =
+          await _supabase.from('student_attendance_summary').select();
 
       final data = response as List;
-      
+
       final g1Students = data.where((s) => s['batch'] == 'G1');
       final g2Students = data.where((s) => s['batch'] == 'G2');
 
@@ -408,13 +435,10 @@ class AttendanceService {
       final oldStatus = existing['status'];
 
       // Update attendance
-      await _supabase
-          .from('attendance_records')
-          .update({
-            'status': newStatus.displayName,
-            'updated_at': DateTime.now().toIso8601String(),
-          })
-          .eq('id', attendanceId);
+      await _supabase.from('attendance_records').update({
+        'status': newStatus.displayName,
+        'updated_at': DateTime.now().toIso8601String(),
+      }).eq('id', attendanceId);
 
       // Create audit log
       final auditLog = AuditLog.createAttendanceOverride(
@@ -489,37 +513,37 @@ class AttendanceService {
   }
 
   Future<double> getStudentAttendancePercentage(String studentId) async {
-      try {
-        // 1. Get all attendance records for the student
-        final response = await _supabase
-            .from('attendance_records')
-            .select('date, status')
-            .eq('user_id', studentId);
+    try {
+      // 1. Get all attendance records for the student
+      final response = await _supabase
+          .from('attendance_records')
+          .select('date, status')
+          .eq('user_id', studentId);
 
-        final records = response as List;
-        int totalWorkingDays = 0;
-        int presentDays = 0;
-        
-        for (final rec in records) {
-            final dateStr = rec['date'] as String;
-            final date = DateTime.parse(dateStr);
-            final status = rec['status'] as String;
-            
-            // Verify if it is/was a working day (honoring overrides)
-            if (await isWorkingDay(date)) {
-                totalWorkingDays++;
-                if (status == 'PRESENT') {
-                    presentDays++;
-                }
-            }
+      final records = response as List;
+      int totalWorkingDays = 0;
+      int presentDays = 0;
+
+      for (final rec in records) {
+        final dateStr = rec['date'] as String;
+        final date = DateTime.parse(dateStr);
+        final status = rec['status'] as String;
+
+        // Verify if it is/was a working day (honoring overrides)
+        if (await isWorkingDay(date)) {
+          totalWorkingDays++;
+          if (status == 'PRESENT') {
+            presentDays++;
+          }
         }
-        
-        if (totalWorkingDays == 0) return 0.0;
-        return (presentDays / totalWorkingDays) * 100; 
-      } catch (e) {
-        debugPrint("Error calculating attendance: $e");
-        return 0.0;
       }
+
+      if (totalWorkingDays == 0) return 0.0;
+      return (presentDays / totalWorkingDays) * 100;
+    } catch (e) {
+      debugPrint("Error calculating attendance: $e");
+      return 0.0;
+    }
   }
 
   // ========================================
@@ -551,11 +575,238 @@ class AttendanceService {
 
       // Use upsert to insert or update based on user_id + date
       await _supabase.from('attendance_records').upsert(
-        records,
-        onConflict: 'user_id,date',
-      );
+            records,
+            onConflict: 'user_id,date',
+          );
     } catch (e) {
       throw Exception('Failed to save bulk attendance: ${e.toString()}');
     }
   }
+
+  Future<AttendanceMarkingResult> markAttendanceForIndividuals({
+    required List<String> studentIds,
+    required List<DateTime> dates,
+    required AttendanceStatus status,
+    required String markedBy,
+    required Map<String, String?> studentTeamMap,
+  }) async {
+    final uniqueStudents = studentIds.toSet().toList();
+    final uniqueDates = dates
+        .map((date) => DateTime(date.year, date.month, date.day))
+        .toSet()
+        .toList()
+      ..sort((a, b) => a.compareTo(b));
+
+    if (uniqueStudents.isEmpty) {
+      throw Exception('Select at least one student');
+    }
+    if (uniqueDates.isEmpty) {
+      throw Exception('Select at least one working day');
+    }
+
+    final totalRequests = uniqueStudents.length * uniqueDates.length;
+    final dateStrings = uniqueDates
+        .map((date) => date.toIso8601String().split('T')[0])
+        .toList();
+
+    final existingResponse = await _supabase
+        .from('attendance_records')
+        .select('user_id, date, status')
+        .inFilter('user_id', uniqueStudents)
+        .inFilter('date', dateStrings);
+
+    final existingMap = <String, String>{};
+    for (final record in existingResponse as List) {
+      final key = '${record['user_id']}-${record['date']}';
+      existingMap[key] = record['status'] as String? ?? '';
+    }
+
+    final candidates = <_AttendanceWriteCandidate>[];
+    var skippedCount = 0;
+
+    for (final studentId in uniqueStudents) {
+      final teamId = studentTeamMap[studentId] ?? '';
+      for (final date in uniqueDates) {
+        final dateKey = date.toIso8601String().split('T')[0];
+        final compoundKey = '$studentId-$dateKey';
+        final existingStatus = existingMap[compoundKey];
+
+        if (existingStatus != null &&
+            existingStatus.toUpperCase() == status.displayName) {
+          skippedCount += 1;
+          continue;
+        }
+
+        final previousStatus =
+            existingStatus != null && existingStatus.isNotEmpty
+                ? AttendanceStatus.fromString(existingStatus)
+                : null;
+
+        final record = {
+          'user_id': studentId,
+          'team_id': teamId,
+          'date': dateKey,
+          'status': status.displayName,
+          'marked_by': markedBy,
+          'updated_at': DateTime.now().toIso8601String(),
+        };
+
+        candidates.add(
+          _AttendanceWriteCandidate(
+            payload: record,
+            snapshot: AttendanceAppliedRecord(
+              studentId: studentId,
+              teamId: teamId,
+              date: date,
+              newStatus: status,
+              previousStatus: previousStatus,
+            ),
+          ),
+        );
+      }
+    }
+
+    final appliedRecords = <AttendanceAppliedRecord>[];
+    final failures = <AttendanceFailure>[];
+
+    for (final chunk in _chunkCandidates(candidates, 50)) {
+      final payload = chunk.map((c) => c.payload).toList();
+      try {
+        await _supabase.from('attendance_records').upsert(
+              payload,
+              onConflict: 'user_id,date',
+            );
+        appliedRecords.addAll(chunk.map((c) => c.snapshot));
+      } catch (e) {
+        for (final candidate in chunk) {
+          failures.add(
+            AttendanceFailure(
+              studentId: candidate.snapshot.studentId,
+              date: candidate.snapshot.date,
+              reason: e.toString(),
+            ),
+          );
+        }
+      }
+    }
+
+    return AttendanceMarkingResult(
+      totalRequests: totalRequests,
+      savedCount: appliedRecords.length,
+      skippedCount: skippedCount,
+      failures: failures,
+      appliedRecords: appliedRecords,
+    );
+  }
+
+  Future<void> revertAttendanceChanges({
+    required List<AttendanceAppliedRecord> records,
+    required String undoActor,
+  }) async {
+    if (records.isEmpty) return;
+
+    final now = DateTime.now().toIso8601String();
+    final upsertPayload = <Map<String, dynamic>>[];
+    final deletes = <Map<String, String>>[];
+
+    for (final record in records) {
+      final dateKey = record.date.toIso8601String().split('T')[0];
+      if (record.previousStatus == null) {
+        deletes.add({'user_id': record.studentId, 'date': dateKey});
+      } else {
+        upsertPayload.add({
+          'user_id': record.studentId,
+          'team_id': record.teamId ?? '',
+          'date': dateKey,
+          'status': record.previousStatus!.displayName,
+          'marked_by': undoActor,
+          'updated_at': now,
+        });
+      }
+    }
+
+    if (upsertPayload.isNotEmpty) {
+      await _supabase.from('attendance_records').upsert(
+            upsertPayload,
+            onConflict: 'user_id,date',
+          );
+    }
+
+    for (final delete in deletes) {
+      await _supabase
+          .from('attendance_records')
+          .delete()
+          .eq('user_id', delete['user_id']!)
+          .eq('date', delete['date']!);
+    }
+  }
+}
+
+Iterable<List<_AttendanceWriteCandidate>> _chunkCandidates(
+  List<_AttendanceWriteCandidate> source,
+  int size,
+) sync* {
+  if (source.isEmpty) return;
+  for (var i = 0; i < source.length; i += size) {
+    final end = (i + size) > source.length ? source.length : i + size;
+    yield source.sublist(i, end);
+  }
+}
+
+class _AttendanceWriteCandidate {
+  final Map<String, dynamic> payload;
+  final AttendanceAppliedRecord snapshot;
+
+  _AttendanceWriteCandidate({
+    required this.payload,
+    required this.snapshot,
+  });
+}
+
+class AttendanceMarkingResult {
+  final int totalRequests;
+  final int savedCount;
+  final int skippedCount;
+  final List<AttendanceFailure> failures;
+  final List<AttendanceAppliedRecord> appliedRecords;
+
+  AttendanceMarkingResult({
+    required this.totalRequests,
+    required this.savedCount,
+    required this.skippedCount,
+    required this.failures,
+    required this.appliedRecords,
+  });
+
+  bool get hasFailures => failures.isNotEmpty;
+
+  int get attemptedWrites => savedCount + failures.length;
+}
+
+class AttendanceFailure {
+  final String studentId;
+  final DateTime date;
+  final String reason;
+
+  AttendanceFailure({
+    required this.studentId,
+    required this.date,
+    required this.reason,
+  });
+}
+
+class AttendanceAppliedRecord {
+  final String studentId;
+  final String? teamId;
+  final DateTime date;
+  final AttendanceStatus newStatus;
+  final AttendanceStatus? previousStatus;
+
+  AttendanceAppliedRecord({
+    required this.studentId,
+    required this.teamId,
+    required this.date,
+    required this.newStatus,
+    required this.previousStatus,
+  });
 }

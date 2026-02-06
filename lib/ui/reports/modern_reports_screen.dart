@@ -11,7 +11,6 @@ import '../../models/task_completion.dart';
 import '../../core/theme/app_dimens.dart';
 import '../widgets/premium_card.dart';
 import 'long_absentees_screen.dart';
-import 'team_analysis_screen.dart';
 import 'all_students_screen.dart';
 import 'scheduled_classes_screen.dart';
 import 'task_completion_details_screen.dart';
@@ -266,20 +265,8 @@ class _ModernReportsScreenState extends State<ModernReportsScreen> {
               ),
               const Divider(height: 1),
               _buildActionTile(
-                'View by Team',
-                'Team-wise attendance analysis',
-                Icons.groups_rounded,
-                Colors.green,
-                () => Navigator.of(context).push(
-                  MaterialPageRoute(
-                    builder: (context) => const TeamAnalysisScreen(),
-                  ),
-                ),
-              ),
-              const Divider(height: 1),
-              _buildActionTile(
-                'View All Students',
-                'See complete attendance records',
+                'View By Team & Students',
+                'Combined attendance analytics',
                 Icons.people_alt_rounded,
                 Colors.blue,
                 () => Navigator.of(context).push(
@@ -408,52 +395,8 @@ class _ModernReportsScreenState extends State<ModernReportsScreen> {
         final stats = snapshot.data ?? DefaulterStats.empty();
 
         if (stats.totalDefaulters == 0) {
-          return Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              _buildSectionHeader('ATTENDANCE ALERTS', colorScheme),
-              const SizedBox(height: AppSpacing.md),
-              PremiumCard(
-                color: Colors.green.withValues(alpha: 0.05),
-                child: Row(
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.all(12),
-                      decoration: BoxDecoration(
-                        color: Colors.green.withValues(alpha: 0.1),
-                        shape: BoxShape.circle,
-                      ),
-                      child: const Icon(Icons.check_circle,
-                          color: Colors.green, size: 28),
-                    ),
-                    const SizedBox(width: AppSpacing.md),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            'All Clear!',
-                            style: GoogleFonts.inter(
-                              fontWeight: FontWeight.bold,
-                              fontSize: 16,
-                              color: Colors.green,
-                            ),
-                          ),
-                          Text(
-                            'No students currently flagged for attendance issues',
-                            style: GoogleFonts.inter(
-                              fontSize: 13,
-                              color: Colors.grey[600],
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          );
+          // Don't show anything if no alerts (Clean UI)
+          return const SizedBox.shrink();
         }
 
         return Column(
@@ -1782,161 +1725,6 @@ class _AllStudentsDialogState extends State<_AllStudentsDialog> {
                                     fontSize: 11, color: Colors.grey[600]),
                               ),
                             ],
-                          ),
-                        );
-                      },
-                    ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-// ========================================
-// SCHEDULED CLASSES DIALOG
-// ========================================
-class _ScheduledClassesDialog extends StatelessWidget {
-  final List<dynamic> scheduled;
-  const _ScheduledClassesDialog({required this.scheduled});
-
-  @override
-  Widget build(BuildContext context) {
-    final now = DateTime.now();
-    final upcoming = scheduled.where((s) => s.date.isAfter(now)).toList();
-
-    return Dialog(
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-      child: Container(
-        width: 500,
-        constraints: const BoxConstraints(maxHeight: 600),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            // Header
-            Container(
-              padding: const EdgeInsets.all(20),
-              decoration: BoxDecoration(
-                color: Colors.purple.withValues(alpha: 0.1),
-                borderRadius:
-                    const BorderRadius.vertical(top: Radius.circular(16)),
-              ),
-              child: Row(
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: Colors.purple.withValues(alpha: 0.2),
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: const Icon(Icons.event_note_rounded,
-                        color: Colors.purple, size: 28),
-                  ),
-                  const SizedBox(width: 16),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'Scheduled Classes',
-                          style: GoogleFonts.poppins(
-                            fontSize: 18,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                        Text(
-                          '${scheduled.length} total • ${upcoming.length} upcoming',
-                          style: GoogleFonts.inter(
-                            fontSize: 13,
-                            color: Colors.grey[600],
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  IconButton(
-                    icon: const Icon(Icons.close),
-                    onPressed: () => Navigator.pop(context),
-                  ),
-                ],
-              ),
-            ),
-
-            // Content
-            Flexible(
-              child: scheduled.isEmpty
-                  ? Center(
-                      child: Padding(
-                        padding: const EdgeInsets.all(32),
-                        child: Column(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(Icons.event_busy,
-                                size: 48, color: Colors.grey[400]),
-                            const SizedBox(height: 12),
-                            Text(
-                              'No Scheduled Classes',
-                              style: GoogleFonts.poppins(
-                                  fontSize: 16, fontWeight: FontWeight.w600),
-                            ),
-                            Text(
-                              'Add scheduled dates in the Attendance screen',
-                              style: GoogleFonts.inter(color: Colors.grey[600]),
-                            ),
-                          ],
-                        ),
-                      ),
-                    )
-                  : ListView.separated(
-                      padding: const EdgeInsets.symmetric(vertical: 8),
-                      itemCount: scheduled.length,
-                      separatorBuilder: (_, __) => const Divider(height: 1),
-                      itemBuilder: (context, index) {
-                        final date = scheduled[index];
-                        final dateStr =
-                            DateFormat('EEE, MMM dd, yyyy').format(date.date);
-                        final isPast = date.date.isBefore(now);
-
-                        return ListTile(
-                          leading: Container(
-                            width: 48,
-                            height: 48,
-                            decoration: BoxDecoration(
-                              color: (isPast ? Colors.green : Colors.blue)
-                                  .withValues(alpha: 0.1),
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            child: Icon(
-                              isPast ? Icons.check_circle : Icons.event,
-                              color: isPast ? Colors.green : Colors.blue,
-                            ),
-                          ),
-                          title: Text(
-                            dateStr,
-                            style:
-                                GoogleFonts.inter(fontWeight: FontWeight.w600),
-                          ),
-                          subtitle: Text(
-                            date.notes ?? 'No notes',
-                            style: GoogleFonts.inter(fontSize: 12),
-                          ),
-                          trailing: Container(
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 10, vertical: 4),
-                            decoration: BoxDecoration(
-                              color: (isPast ? Colors.green : Colors.blue)
-                                  .withValues(alpha: 0.1),
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            child: Text(
-                              isPast ? 'Completed' : 'Upcoming',
-                              style: GoogleFonts.inter(
-                                fontSize: 12,
-                                fontWeight: FontWeight.w600,
-                                color: isPast ? Colors.green : Colors.blue,
-                              ),
-                            ),
                           ),
                         );
                       },

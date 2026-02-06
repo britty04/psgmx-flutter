@@ -168,9 +168,6 @@ class _ScheduledClassesScreenState extends State<ScheduledClassesScreen> {
                           itemBuilder: (context, index) {
                             final item = filteredDates[index];
                             final date = item.date;
-                            // Check if date has "is working day" info (from database)
-                            // For now, we'll assume all are working days unless noted
-                            final isWorking = true;
 
                             // Check if date is today
                             final today = DateTime.now();
@@ -223,9 +220,7 @@ class _ScheduledClassesScreenState extends State<ScheduledClassesScreen> {
                                               ),
                                               const SizedBox(height: 4),
                                               Text(
-                                                isWorking
-                                                    ? 'Working Day'
-                                                    : 'Holiday',
+                                                'Working Day',
                                                 style: GoogleFonts.inter(
                                                   fontSize: 12,
                                                   color: Colors.grey[600],
@@ -290,23 +285,18 @@ class _ScheduledClassesScreenState extends State<ScheduledClassesScreen> {
                                                 vertical: 4,
                                               ),
                                               decoration: BoxDecoration(
-                                                color: isWorking
-                                                    ? Colors.green
-                                                        .withValues(alpha: 0.1)
-                                                    : Colors.orange
+                                                color: Colors.green
                                                         .withValues(alpha: 0.1),
                                                 borderRadius:
                                                     BorderRadius.circular(
                                                         AppRadius.sm),
                                               ),
                                               child: Text(
-                                                isWorking ? 'Class' : 'Off',
+                                                'Class',
                                                 style: GoogleFonts.inter(
                                                   fontSize: 10,
                                                   fontWeight: FontWeight.w600,
-                                                  color: isWorking
-                                                      ? Colors.green
-                                                      : Colors.orange,
+                                                  color: Colors.green,
                                                 ),
                                               ),
                                             ),

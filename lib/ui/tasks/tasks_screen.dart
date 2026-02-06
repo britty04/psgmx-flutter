@@ -1542,7 +1542,7 @@ class _TeamLeaderTasksView extends StatefulWidget {
 
 class _TeamLeaderTasksViewState extends State<_TeamLeaderTasksView> with SingleTickerProviderStateMixin {
   late TabController _tabController;
-  DateTime _selectedDate = DateTime.now();
+  final DateTime _selectedDate = DateTime.now();
 
   @override
   void initState() {
@@ -1579,7 +1579,7 @@ class _TeamLeaderTasksViewState extends State<_TeamLeaderTasksView> with SingleT
         body: TabBarView(
           controller: _tabController,
           children: [
-            _StudentTasksView(),
+            const _StudentTasksView(),
             _TeamVerificationView(date: _selectedDate),
           ],
         ),
@@ -1819,7 +1819,7 @@ class _TeamVerificationViewState extends State<_TeamVerificationView> {
                                             borderRadius:
                                                 BorderRadius.circular(AppRadius.sm),
                                           ),
-                                          child: Row(
+                                          child: const Row(
                                             mainAxisSize: MainAxisSize.min,
                                             children: [
                                               Icon(
@@ -1827,7 +1827,7 @@ class _TeamVerificationViewState extends State<_TeamVerificationView> {
                                                 size: 14,
                                                 color: Colors.blue,
                                               ),
-                                              const SizedBox(width: 4),
+                                              SizedBox(width: 4),
                                               Text(
                                                 'Verified',
                                                 style: TextStyle(

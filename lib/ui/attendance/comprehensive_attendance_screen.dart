@@ -9,9 +9,10 @@ import '../../core/theme/app_dimens.dart';
 import '../../models/attendance.dart';
 import '../../models/scheduled_date.dart';
 import '../widgets/premium_card.dart';
+import 'widgets/individual_attendance_wizard.dart';
 
 /// Comprehensive Attendance Screen with Role-Based Access Control
-/// 
+///
 /// STRICT ACCESS RULES:
 /// - Students: Only "My Attendance" tab
 /// - Team Leaders: "My Attendance" + "My Team" tabs
@@ -23,47 +24,47 @@ class ComprehensiveAttendanceScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final userProvider = Provider.of<UserProvider>(context);
-    
+
     // Determine effective role (considering simulation mode)
     final isActualPlacementRep = userProvider.isActualPlacementRep;
     final isPlacementRep = userProvider.isPlacementRep;
     final isCoordinator = userProvider.isCoordinator;
     final isTeamLeader = userProvider.isTeamLeader;
-    
+
     // Check if user is simulating a different role
     final isSimulating = isActualPlacementRep && !isPlacementRep;
-    
+
     // Build tabs based on CURRENT ACTIVE role (respects simulation)
     List<Widget> tabs = [];
     List<Widget> tabViews = [];
-    
+
     // 1. Everyone gets "My Attendance"
     tabs.add(const Tab(text: 'My Attendance'));
     tabViews.add(const _MyAttendanceTab());
-    
+
     // 2. Team Leaders, Coordinators, and Placement Rep get "My Team" (when not student)
     if (isTeamLeader || isCoordinator || (isPlacementRep && !isSimulating)) {
       tabs.add(const Tab(text: 'My Team'));
       tabViews.add(const _MyTeamAttendanceTab());
     }
-    
+
     // 3. Coordinators and Placement Rep get "Schedule" (when not student/team leader)
     if (isCoordinator || (isActualPlacementRep && !isSimulating)) {
       tabs.add(const Tab(text: 'Schedule'));
       tabViews.add(const _ScheduleClassesTab());
     }
-    
+
     // 4. Only ACTUAL Placement Rep gets "Overall" (NEVER shown when simulating)
     if (isActualPlacementRep && !isSimulating) {
       tabs.add(const Tab(text: 'Overall'));
       tabViews.add(const _OverallAttendanceTab());
     }
-    
+
     // Calculate tab alignment based on count
     // 1-2 tabs: Center, 3+ tabs: Spread evenly, 5+ tabs: Scrollable
     final TabAlignment tabAlignment;
     final bool isScrollable;
-    
+
     if (tabs.length <= 2) {
       tabAlignment = TabAlignment.center;
       isScrollable = false;
@@ -91,13 +92,17 @@ class ComprehensiveAttendanceScreen extends StatelessWidget {
               floating: true,
               forceElevated: innerBoxIsScrolled,
               bottom: PreferredSize(
-                preferredSize: const Size.fromHeight(56),
+                preferredSize: const Size.fromHeight(
+                    92), // Increased height to prevent overflow (85 -> 92)
                 child: Container(
+                  padding: const EdgeInsets.only(bottom: 8),
                   decoration: BoxDecoration(
                     color: Theme.of(context).scaffoldBackgroundColor,
                     border: Border(
                       bottom: BorderSide(
-                        color: Theme.of(context).dividerColor.withValues(alpha: 0.1),
+                        color: Theme.of(context)
+                            .dividerColor
+                            .withValues(alpha: 0.1),
                       ),
                     ),
                   ),
@@ -105,7 +110,10 @@ class ComprehensiveAttendanceScreen extends StatelessWidget {
                     isScrollable: isScrollable,
                     tabAlignment: tabAlignment,
                     labelColor: Theme.of(context).colorScheme.primary,
-                    unselectedLabelColor: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
+                    unselectedLabelColor: Theme.of(context)
+                        .colorScheme
+                        .onSurface
+                        .withValues(alpha: 0.6),
                     labelStyle: GoogleFonts.inter(
                       fontWeight: FontWeight.w600,
                       fontSize: 15,
@@ -125,8 +133,10 @@ class ComprehensiveAttendanceScreen extends StatelessWidget {
                       ),
                     ),
                     dividerColor: Colors.transparent,
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                    labelPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    labelPadding:
+                        const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                     tabs: tabs,
                   ),
                 ),
@@ -325,7 +335,8 @@ class _MyAttendanceTabState extends State<_MyAttendanceTab> {
             )
           else
             ..._recentAttendance.map((attendance) {
-              final dateStr = DateFormat('MMM dd, yyyy').format(attendance.date);
+              final dateStr =
+                  DateFormat('MMM dd, yyyy').format(attendance.date);
               final isPresent = attendance.status == AttendanceStatus.present;
               final color = isPresent ? Colors.green : Colors.red;
 
@@ -405,7 +416,8 @@ class _MyTeamAttendanceTabState extends State<_MyTeamAttendanceTab> {
         );
 
         // Load All Teams data
-        final allTeams = await _attendanceService.getAllTeamsAttendanceSummary();
+        final allTeams =
+            await _attendanceService.getAllTeamsAttendanceSummary();
 
         if (mounted) {
           setState(() {
@@ -445,12 +457,9 @@ class _MyTeamAttendanceTabState extends State<_MyTeamAttendanceTab> {
           // Toggle Switch Header
           _buildToggleHeader(),
           const SizedBox(height: AppSpacing.lg),
-          
+
           // Content based on toggle
-          if (_showAllTeams)
-            ..._buildAllTeamsView()
-          else
-            ..._buildMyTeamView(),
+          if (_showAllTeams) ..._buildAllTeamsView() else ..._buildMyTeamView(),
         ],
       ),
     );
@@ -574,7 +583,7 @@ class _MyTeamAttendanceTabState extends State<_MyTeamAttendanceTab> {
       final avgPercentage = team['average_percentage'] as double;
       final memberCount = team['member_count'] as int;
       final teamName = team['team_name'] as String;
-      
+
       // Medal/Rank colors
       Color rankColor;
       IconData rankIcon;
@@ -680,7 +689,8 @@ class _MyTeamAttendanceTabState extends State<_MyTeamAttendanceTab> {
               color: Colors.orange.withValues(alpha: 0.1),
               borderRadius: BorderRadius.circular(12),
             ),
-            child: const Icon(Icons.info_outline, color: Colors.orange, size: 32),
+            child:
+                const Icon(Icons.info_outline, color: Colors.orange, size: 32),
           ),
           const SizedBox(width: AppSpacing.md),
           Expanded(
@@ -870,8 +880,9 @@ class _ScheduleClassesTabState extends State<_ScheduleClassesTab> {
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final userProvider = Provider.of<UserProvider>(context);
-    final isPlacementRep = userProvider.isPlacementRep || userProvider.isActualPlacementRep;
-    
+    final isPlacementRep =
+        userProvider.isPlacementRep || userProvider.isActualPlacementRep;
+
     if (_isLoading) {
       return const Center(child: CircularProgressIndicator());
     }
@@ -894,7 +905,8 @@ class _ScheduleClassesTabState extends State<_ScheduleClassesTab> {
                         color: Colors.blue.withValues(alpha: 0.1),
                         borderRadius: BorderRadius.circular(12),
                       ),
-                      child: const Icon(Icons.calendar_month, color: Colors.blue, size: 24),
+                      child: const Icon(Icons.calendar_month,
+                          color: Colors.blue, size: 24),
                     ),
                     const SizedBox(width: 12),
                     Expanded(
@@ -981,15 +993,16 @@ class _ScheduleClassesTabState extends State<_ScheduleClassesTab> {
           else
             ...List.generate(_scheduledDates.length, (index) {
               final schedule = _scheduledDates[index];
-              final isToday = DateUtils.isSameDay(schedule.date, DateTime.now());
+              final isToday =
+                  DateUtils.isSameDay(schedule.date, DateTime.now());
               final isPast = schedule.date.isBefore(DateTime.now());
-              
+
               return Padding(
                 padding: const EdgeInsets.only(bottom: 12),
                 child: PremiumCard(
-                  color: isToday 
+                  color: isToday
                       ? Theme.of(context).primaryColor.withValues(alpha: 0.08)
-                      : isPast 
+                      : isPast
                           ? (isDark ? Colors.grey[850] : Colors.grey[100])
                           : null,
                   child: Row(
@@ -998,9 +1011,9 @@ class _ScheduleClassesTabState extends State<_ScheduleClassesTab> {
                         width: 60,
                         height: 60,
                         decoration: BoxDecoration(
-                          color: isToday 
+                          color: isToday
                               ? Theme.of(context).primaryColor
-                              : isPast 
+                              : isPast
                                   ? Colors.grey
                                   : Colors.blue,
                           borderRadius: BorderRadius.circular(12),
@@ -1017,7 +1030,9 @@ class _ScheduleClassesTabState extends State<_ScheduleClassesTab> {
                               ),
                             ),
                             Text(
-                              DateFormat('MMM').format(schedule.date).toUpperCase(),
+                              DateFormat('MMM')
+                                  .format(schedule.date)
+                                  .toUpperCase(),
                               style: GoogleFonts.inter(
                                 fontSize: 11,
                                 fontWeight: FontWeight.w600,
@@ -1045,7 +1060,8 @@ class _ScheduleClassesTabState extends State<_ScheduleClassesTab> {
                                 if (isToday) ...[
                                   const SizedBox(width: 8),
                                   Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                                    padding: const EdgeInsets.symmetric(
+                                        horizontal: 8, vertical: 2),
                                     decoration: BoxDecoration(
                                       color: Theme.of(context).primaryColor,
                                       borderRadius: BorderRadius.circular(10),
@@ -1063,7 +1079,8 @@ class _ScheduleClassesTabState extends State<_ScheduleClassesTab> {
                                 if (isPast) ...[
                                   const SizedBox(width: 8),
                                   Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                                    padding: const EdgeInsets.symmetric(
+                                        horizontal: 8, vertical: 2),
                                     decoration: BoxDecoration(
                                       color: Colors.grey,
                                       borderRadius: BorderRadius.circular(10),
@@ -1094,7 +1111,8 @@ class _ScheduleClassesTabState extends State<_ScheduleClassesTab> {
                       if (isPlacementRep && !isPast)
                         IconButton(
                           onPressed: () => _deleteSchedule(schedule.id),
-                          icon: Icon(Icons.delete_outline, color: Colors.red[400], size: 22),
+                          icon: Icon(Icons.delete_outline,
+                              color: Colors.red[400], size: 22),
                           tooltip: 'Remove',
                         ),
                     ],
@@ -1128,7 +1146,8 @@ class _ScheduleClassesTabState extends State<_ScheduleClassesTab> {
         if (mounted) {
           scaffoldMessenger.showSnackBar(
             SnackBar(
-              content: Text('Class scheduled for ${DateFormat('MMM dd, yyyy').format(selectedDate)}'),
+              content: Text(
+                  'Class scheduled for ${DateFormat('MMM dd, yyyy').format(selectedDate)}'),
               backgroundColor: Colors.green,
             ),
           );
@@ -1136,7 +1155,9 @@ class _ScheduleClassesTabState extends State<_ScheduleClassesTab> {
       } catch (e) {
         if (mounted) {
           scaffoldMessenger.showSnackBar(
-            SnackBar(content: Text('Error scheduling: $e'), backgroundColor: Colors.red),
+            SnackBar(
+                content: Text('Error scheduling: $e'),
+                backgroundColor: Colors.red),
           );
         }
       }
@@ -1150,7 +1171,9 @@ class _ScheduleClassesTabState extends State<_ScheduleClassesTab> {
       await _loadData();
       if (mounted) {
         scaffoldMessenger.showSnackBar(
-          const SnackBar(content: Text('Schedule removed'), backgroundColor: Colors.orange),
+          const SnackBar(
+              content: Text('Schedule removed'),
+              backgroundColor: Colors.orange),
         );
       }
     } catch (e) {
@@ -1188,7 +1211,8 @@ class _OverallAttendanceTabState extends State<_OverallAttendanceTab> {
   Future<void> _loadData() async {
     setState(() => _isLoading = true);
     try {
-      final students = await _attendanceService.getAllStudentsAttendanceSummary();
+      final students =
+          await _attendanceService.getAllStudentsAttendanceSummary();
 
       if (mounted) {
         setState(() {
@@ -1240,7 +1264,8 @@ class _OverallAttendanceTabState extends State<_OverallAttendanceTab> {
                   color: Colors.green.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(12),
                 ),
-                child: const Icon(Icons.how_to_reg, color: Colors.green, size: 28),
+                child:
+                    const Icon(Icons.how_to_reg, color: Colors.green, size: 28),
               ),
               const SizedBox(width: AppSpacing.md),
               Expanded(
@@ -1255,7 +1280,7 @@ class _OverallAttendanceTabState extends State<_OverallAttendanceTab> {
                       ),
                     ),
                     Text(
-                      'Mark attendance for all 123 students',
+                      'Mark everyone at once or target specific students across dates',
                       style: GoogleFonts.inter(
                         fontSize: 13,
                         color: Colors.grey[600],
@@ -1294,6 +1319,18 @@ class _OverallAttendanceTabState extends State<_OverallAttendanceTab> {
               ),
             ],
           ),
+          const SizedBox(height: AppSpacing.md),
+          SizedBox(
+            width: double.infinity,
+            child: FilledButton.tonalIcon(
+              onPressed: _allStudents.isEmpty
+                  ? null
+                  : () => _openIndividualAttendanceWizard(),
+              icon: const Icon(Icons.people_outline),
+              label: const Text('Select individuals & range'),
+              style: FilledButton.styleFrom(padding: const EdgeInsets.all(16)),
+            ),
+          ),
         ],
       ),
     );
@@ -1327,18 +1364,111 @@ class _OverallAttendanceTabState extends State<_OverallAttendanceTab> {
     );
   }
 
+  Future<void> _openIndividualAttendanceWizard() async {
+    if (_allStudents.isEmpty) return;
+
+    final userProvider = Provider.of<UserProvider>(context, listen: false);
+    final markedBy = userProvider.currentUser?.uid;
+
+    if (markedBy == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+            content: Text(
+                'Unable to identify current user. Please re-authenticate.')),
+      );
+      return;
+    }
+
+    final result = await showModalBottomSheet<AttendanceMarkingResult>(
+      context: context,
+      isScrollControlled: true,
+      useSafeArea: true,
+      builder: (_) => IndividualAttendanceWizard(
+        allStudents: _allStudents,
+        markedBy: markedBy,
+      ),
+    );
+
+    if (!mounted || result == null) return;
+
+    await _loadData();
+    if (!context.mounted) return;
+
+    final markedLabel =
+        result.savedCount == 1 ? '1 record' : '${result.savedCount} records';
+
+    final buffer = StringBuffer('Marked $markedLabel');
+    if (result.totalRequests > 0) {
+      buffer.write(' out of ${result.totalRequests} requested');
+    }
+    if (result.skippedCount > 0) {
+      buffer.write(' • ${result.skippedCount} already up-to-date');
+    }
+    if (result.failures.isNotEmpty) {
+      buffer.write(' • ${result.failures.length} failed');
+    }
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(buffer.toString()),
+        action: result.appliedRecords.isEmpty
+            ? null
+            : SnackBarAction(
+                label: 'Undo',
+                onPressed: () {
+                  _handleUndo(result);
+                },
+              ),
+      ),
+    );
+  }
+
+  Future<void> _handleUndo(AttendanceMarkingResult result) async {
+    if (result.appliedRecords.isEmpty) return;
+
+    final userProvider = Provider.of<UserProvider>(context, listen: false);
+    final actor = userProvider.currentUser?.uid;
+
+    if (actor == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+            content: Text('Unable to undo without a valid user session.')),
+      );
+      return;
+    }
+
+    try {
+      await _attendanceService.revertAttendanceChanges(
+        records: result.appliedRecords,
+        undoActor: actor,
+      );
+      if (!mounted) return;
+      await _loadData();
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+            content: Text('Individual attendance changes reverted.')),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Undo failed: $e')),
+      );
+    }
+  }
+
   Widget _buildOverallStatsCard() {
     final avgPercentage = _allStudents.fold<double>(
           0,
           (sum, student) => sum + student.attendancePercentage,
         ) /
         (_allStudents.isEmpty ? 1 : _allStudents.length);
-    
+
     final totalPresent = _allStudents.fold<int>(
       0,
       (sum, student) => sum + student.presentCount,
     );
-    
+
     final totalAbsent = _allStudents.fold<int>(
       0,
       (sum, student) => sum + student.absentCount,
@@ -1356,7 +1486,8 @@ class _OverallAttendanceTabState extends State<_OverallAttendanceTab> {
                   color: Colors.blue.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(12),
                 ),
-                child: const Icon(Icons.analytics_outlined, color: Colors.blue, size: 24),
+                child: const Icon(Icons.analytics_outlined,
+                    color: Colors.blue, size: 24),
               ),
               const SizedBox(width: 12),
               Text(
@@ -1416,8 +1547,9 @@ class _OverallAttendanceTabState extends State<_OverallAttendanceTab> {
       ),
     );
   }
-  
-  Widget _buildModernStatCard(String label, String value, IconData icon, Color color) {
+
+  Widget _buildModernStatCard(
+      String label, String value, IconData icon, Color color) {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -1455,7 +1587,8 @@ class _OverallAttendanceTabState extends State<_OverallAttendanceTab> {
   Widget _buildStudentsList() {
     // Sort students by attendance percentage (lowest first)
     final sortedStudents = List<AttendanceSummary>.from(_allStudents)
-      ..sort((a, b) => a.attendancePercentage.compareTo(b.attendancePercentage));
+      ..sort(
+          (a, b) => a.attendancePercentage.compareTo(b.attendancePercentage));
 
     return PremiumCard(
       child: Column(
@@ -1499,10 +1632,10 @@ class _OverallAttendanceTabState extends State<_OverallAttendanceTab> {
           const Divider(height: 1),
           ...sortedStudents.map((student) {
             final percentage = student.attendancePercentage;
-            final color = percentage >= 75 
-                ? Colors.green 
-                : percentage >= 50 
-                    ? Colors.orange 
+            final color = percentage >= 75
+                ? Colors.green
+                : percentage >= 50
+                    ? Colors.orange
                     : Colors.red;
 
             return Container(
@@ -1520,7 +1653,12 @@ class _OverallAttendanceTabState extends State<_OverallAttendanceTab> {
                 leading: CircleAvatar(
                   backgroundColor: color.withValues(alpha: 0.2),
                   child: Text(
-                    student.name.split(' ').map((n) => n[0]).take(2).join().toUpperCase(),
+                    student.name
+                        .split(' ')
+                        .map((n) => n[0])
+                        .take(2)
+                        .join()
+                        .toUpperCase(),
                     style: TextStyle(
                       color: color,
                       fontWeight: FontWeight.bold,
@@ -1544,8 +1682,8 @@ class _OverallAttendanceTabState extends State<_OverallAttendanceTab> {
                 ),
                 trailing: Container(
                   padding: const EdgeInsets.symmetric(
-                    horizontal: 12,
-                    vertical: 8,
+                    horizontal: 8,
+                    vertical: 4,
                   ),
                   decoration: BoxDecoration(
                     color: color.withValues(alpha: 0.15),
@@ -1559,7 +1697,7 @@ class _OverallAttendanceTabState extends State<_OverallAttendanceTab> {
                         '${percentage.toStringAsFixed(1)}%',
                         style: GoogleFonts.inter(
                           fontWeight: FontWeight.bold,
-                          fontSize: 15,
+                          fontSize: 14,
                           color: color,
                         ),
                       ),
@@ -1655,12 +1793,12 @@ class _MultiDatePickerDialogState extends State<_MultiDatePickerDialog> {
               ),
             ),
             const SizedBox(height: AppSpacing.lg),
-            
+
             // Calendar view
             _buildCalendar(),
-            
+
             const SizedBox(height: AppSpacing.lg),
-            
+
             // Selected dates display
             if (_selectedDates.isNotEmpty) ...[
               Text(
@@ -1692,7 +1830,7 @@ class _MultiDatePickerDialogState extends State<_MultiDatePickerDialog> {
               ),
               const SizedBox(height: AppSpacing.lg),
             ],
-            
+
             // Notes field
             TextField(
               controller: _notesController,
@@ -1703,9 +1841,9 @@ class _MultiDatePickerDialogState extends State<_MultiDatePickerDialog> {
               ),
               maxLines: 2,
             ),
-            
+
             const SizedBox(height: AppSpacing.lg),
-            
+
             // Action buttons
             Row(
               mainAxisAlignment: MainAxisAlignment.end,
@@ -1754,7 +1892,8 @@ class _MultiDatePickerDialogState extends State<_MultiDatePickerDialog> {
             ),
             decoration: BoxDecoration(
               color: Colors.grey[100],
-              borderRadius: const BorderRadius.vertical(top: Radius.circular(12)),
+              borderRadius:
+                  const BorderRadius.vertical(top: Radius.circular(12)),
             ),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -1791,7 +1930,7 @@ class _MultiDatePickerDialogState extends State<_MultiDatePickerDialog> {
               ],
             ),
           ),
-          
+
           // Weekday headers
           Padding(
             padding: const EdgeInsets.all(AppSpacing.sm),
@@ -1814,7 +1953,7 @@ class _MultiDatePickerDialogState extends State<_MultiDatePickerDialog> {
                   .toList(),
             ),
           ),
-          
+
           // Calendar grid
           Padding(
             padding: const EdgeInsets.all(AppSpacing.sm),
@@ -1827,7 +1966,8 @@ class _MultiDatePickerDialogState extends State<_MultiDatePickerDialog> {
 
   Widget _buildCalendarGrid() {
     final firstDayOfMonth = DateTime(_focusedDate.year, _focusedDate.month, 1);
-    final lastDayOfMonth = DateTime(_focusedDate.year, _focusedDate.month + 1, 0);
+    final lastDayOfMonth =
+        DateTime(_focusedDate.year, _focusedDate.month + 1, 0);
     final startingWeekday = firstDayOfMonth.weekday % 7;
     final today = DateTime.now();
 
@@ -1922,20 +2062,21 @@ class _BulkAttendanceSheetState extends State<_BulkAttendanceSheet> {
     super.initState();
     _attendanceService = AttendanceService();
     _attendanceMap = {};
-    
+
     // Initialize all students as present by default
     for (var student in widget.allStudents) {
       _attendanceMap[student.studentId] = AttendanceStatus.present;
     }
-    
+
     _loadExistingAttendance();
   }
 
   Future<void> _loadExistingAttendance() async {
     try {
       // Load existing attendance for this date
-      final existing = await _attendanceService.getAttendanceForDate(widget.date);
-      
+      final existing =
+          await _attendanceService.getAttendanceForDate(widget.date);
+
       if (mounted) {
         setState(() {
           for (var record in existing) {
@@ -1953,34 +2094,34 @@ class _BulkAttendanceSheetState extends State<_BulkAttendanceSheet> {
 
   List<AttendanceSummary> get _filteredStudents {
     var students = widget.allStudents;
-    
+
     // Apply search filter
     if (_searchQuery.isNotEmpty) {
       students = students.where((s) {
         return s.name.toLowerCase().contains(_searchQuery.toLowerCase()) ||
-               s.regNo.toLowerCase().contains(_searchQuery.toLowerCase());
+            s.regNo.toLowerCase().contains(_searchQuery.toLowerCase());
       }).toList();
     }
-    
+
     // Apply status filter
     if (_filterStatus == 'present') {
-      students = students.where((s) => 
-        _attendanceMap[s.studentId] == AttendanceStatus.present
-      ).toList();
+      students = students
+          .where((s) => _attendanceMap[s.studentId] == AttendanceStatus.present)
+          .toList();
     } else if (_filterStatus == 'absent') {
-      students = students.where((s) => 
-        _attendanceMap[s.studentId] == AttendanceStatus.absent
-      ).toList();
+      students = students
+          .where((s) => _attendanceMap[s.studentId] == AttendanceStatus.absent)
+          .toList();
     }
-    
+
     return students;
   }
 
-  int get _presentCount => _attendanceMap.values
-      .where((s) => s == AttendanceStatus.present).length;
-  
-  int get _absentCount => _attendanceMap.values
-      .where((s) => s == AttendanceStatus.absent).length;
+  int get _presentCount =>
+      _attendanceMap.values.where((s) => s == AttendanceStatus.present).length;
+
+  int get _absentCount =>
+      _attendanceMap.values.where((s) => s == AttendanceStatus.absent).length;
 
   void _toggleStatus(String studentId) {
     setState(() {
@@ -2022,11 +2163,12 @@ class _BulkAttendanceSheetState extends State<_BulkAttendanceSheet> {
           (s) => s.studentId == entry.key,
           orElse: () => widget.allStudents.first,
         );
-        
+
         return {
           'user_id': entry.key,
           'date': widget.date.toIso8601String().split('T')[0],
-          'status': entry.value == AttendanceStatus.present ? 'PRESENT' : 'ABSENT',
+          'status':
+              entry.value == AttendanceStatus.present ? 'PRESENT' : 'ABSENT',
           'marked_by': markedBy,
           'team_id': student.teamId ?? 'G1', // Include team_id (required field)
           'created_at': DateTime.now().toIso8601String(),
@@ -2044,7 +2186,8 @@ class _BulkAttendanceSheetState extends State<_BulkAttendanceSheet> {
               children: [
                 const Icon(Icons.check_circle, color: Colors.white),
                 const SizedBox(width: 8),
-                Text('Attendance saved for ${DateFormat('MMM dd, yyyy').format(widget.date)}'),
+                Text(
+                    'Attendance saved for ${DateFormat('MMM dd, yyyy').format(widget.date)}'),
               ],
             ),
             backgroundColor: Colors.green,
@@ -2064,8 +2207,8 @@ class _BulkAttendanceSheetState extends State<_BulkAttendanceSheet> {
   @override
   Widget build(BuildContext context) {
     final dateStr = DateFormat('EEEE, MMMM dd, yyyy').format(widget.date);
-    final isToday = DateFormat('yyyy-MM-dd').format(widget.date) == 
-                    DateFormat('yyyy-MM-dd').format(DateTime.now());
+    final isToday = DateFormat('yyyy-MM-dd').format(widget.date) ==
+        DateFormat('yyyy-MM-dd').format(DateTime.now());
 
     return Container(
       height: MediaQuery.of(context).size.height * 0.9,
@@ -2085,7 +2228,7 @@ class _BulkAttendanceSheetState extends State<_BulkAttendanceSheet> {
               borderRadius: BorderRadius.circular(2),
             ),
           ),
-          
+
           // Header
           Padding(
             padding: const EdgeInsets.all(AppSpacing.lg),
@@ -2097,8 +2240,8 @@ class _BulkAttendanceSheetState extends State<_BulkAttendanceSheet> {
                     Container(
                       padding: const EdgeInsets.all(12),
                       decoration: BoxDecoration(
-                        color: isToday 
-                            ? Colors.green.withValues(alpha: 0.1) 
+                        color: isToday
+                            ? Colors.green.withValues(alpha: 0.1)
                             : Colors.blue.withValues(alpha: 0.1),
                         borderRadius: BorderRadius.circular(12),
                       ),
@@ -2136,9 +2279,9 @@ class _BulkAttendanceSheetState extends State<_BulkAttendanceSheet> {
                     ),
                   ],
                 ),
-                
+
                 const SizedBox(height: AppSpacing.lg),
-                
+
                 // Stats row
                 Row(
                   children: [
@@ -2167,9 +2310,9 @@ class _BulkAttendanceSheetState extends State<_BulkAttendanceSheet> {
                     ),
                   ],
                 ),
-                
+
                 const SizedBox(height: AppSpacing.lg),
-                
+
                 // Quick actions
                 Row(
                   children: [
@@ -2198,9 +2341,9 @@ class _BulkAttendanceSheetState extends State<_BulkAttendanceSheet> {
                     ),
                   ],
                 ),
-                
+
                 const SizedBox(height: AppSpacing.md),
-                
+
                 // Search and filter
                 Row(
                   children: [
@@ -2234,8 +2377,10 @@ class _BulkAttendanceSheetState extends State<_BulkAttendanceSheet> {
                       },
                       itemBuilder: (context) => [
                         const PopupMenuItem(value: 'all', child: Text('All')),
-                        const PopupMenuItem(value: 'present', child: Text('Present Only')),
-                        const PopupMenuItem(value: 'absent', child: Text('Absent Only')),
+                        const PopupMenuItem(
+                            value: 'present', child: Text('Present Only')),
+                        const PopupMenuItem(
+                            value: 'absent', child: Text('Absent Only')),
                       ],
                     ),
                   ],
@@ -2243,7 +2388,7 @@ class _BulkAttendanceSheetState extends State<_BulkAttendanceSheet> {
               ],
             ),
           ),
-          
+
           // Student list
           Expanded(
             child: ListView.builder(
@@ -2251,15 +2396,16 @@ class _BulkAttendanceSheetState extends State<_BulkAttendanceSheet> {
               itemCount: _filteredStudents.length,
               itemBuilder: (context, index) {
                 final student = _filteredStudents[index];
-                final status = _attendanceMap[student.studentId] ?? AttendanceStatus.present;
+                final status = _attendanceMap[student.studentId] ??
+                    AttendanceStatus.present;
                 final isPresent = status == AttendanceStatus.present;
 
                 return Card(
                   margin: const EdgeInsets.only(bottom: AppSpacing.sm),
                   child: ListTile(
                     leading: CircleAvatar(
-                      backgroundColor: isPresent 
-                          ? Colors.green.withValues(alpha: 0.1) 
+                      backgroundColor: isPresent
+                          ? Colors.green.withValues(alpha: 0.1)
                           : Colors.red.withValues(alpha: 0.1),
                       child: Text(
                         student.name[0].toUpperCase(),
@@ -2300,7 +2446,7 @@ class _BulkAttendanceSheetState extends State<_BulkAttendanceSheet> {
               },
             ),
           ),
-          
+
           // Save button
           Container(
             padding: const EdgeInsets.all(AppSpacing.lg),
@@ -2319,7 +2465,7 @@ class _BulkAttendanceSheetState extends State<_BulkAttendanceSheet> {
                 width: double.infinity,
                 child: ElevatedButton.icon(
                   onPressed: _isSaving ? null : _saveAttendance,
-                  icon: _isSaving 
+                  icon: _isSaving
                       ? const SizedBox(
                           width: 20,
                           height: 20,

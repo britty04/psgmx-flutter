@@ -71,7 +71,7 @@ class _IOSInstallGuideState extends State<IOSInstallGuide> {
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.1),
+            color: Colors.black.withValues(alpha: 0.1),
             blurRadius: 8,
             offset: const Offset(0, 2),
           ),
@@ -141,25 +141,25 @@ class _InstallGuideBottomSheet extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final steps = [
-      _InstallStep(
+      const _InstallStep(
         number: 1,
         icon: Icons.share_outlined,
         title: 'Tap the Share button',
         description: 'Look for the square with an arrow pointing up at the bottom of Safari',
       ),
-      _InstallStep(
+      const _InstallStep(
         number: 2,
         icon: Icons.add_box_outlined,
         title: 'Select "Add to Home Screen"',
         description: 'Scroll down in the share menu and tap "Add to Home Screen"',
       ),
-      _InstallStep(
+      const _InstallStep(
         number: 3,
         icon: Icons.edit_outlined,
         title: 'Confirm the name',
         description: 'The app will be named "PSGMX". Tap "Add" in the top right',
       ),
-      _InstallStep(
+      const _InstallStep(
         number: 4,
         icon: Icons.check_circle_outline,
         title: 'Launch from Home Screen',
@@ -196,15 +196,23 @@ class _InstallGuideBottomSheet extends StatelessWidget {
                 child: Column(
                   children: [
                     Container(
-                      padding: const EdgeInsets.all(16),
+                      width: 100,
+                      height: 100,
                       decoration: BoxDecoration(
-                        color: Theme.of(context).colorScheme.primaryContainer,
                         shape: BoxShape.circle,
+                        boxShadow: [
+                          BoxShadow(
+                            color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.2),
+                            blurRadius: 16,
+                            offset: const Offset(0, 4),
+                          ),
+                        ],
                       ),
-                      child: Icon(
-                        Icons.install_mobile,
-                        size: 40,
-                        color: Theme.of(context).colorScheme.primary,
+                      child: ClipOval(
+                        child: Image.asset(
+                          'assets/images/psgmx_logo_transparent.png',
+                          fit: BoxFit.cover,
+                        ),
                       ),
                     ),
                     const SizedBox(height: 16),
@@ -265,10 +273,10 @@ class _InstallGuideBottomSheet extends StatelessWidget {
                         Navigator.pop(context);
                         onDismiss();
                       },
-                      child: const Text("Don't show this again"),
                       style: TextButton.styleFrom(
                         minimumSize: const Size.fromHeight(48),
                       ),
+                      child: const Text("Don't show this again"),
                     ),
                   ],
                 ),

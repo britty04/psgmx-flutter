@@ -108,11 +108,11 @@ class LeetCodeAutoRefreshService {
     }
   }
 
-  /// C2: Check for milestone achievements
+  /// C2: Check for milestone achievements for ALL users
   Future<void> _checkMilestones() async {
     try {
-      debugPrint('[AutoRefresh] Checking for milestone achievements...');
-      await _performanceService.checkAndAnnounceMilestone();
+      debugPrint('[AutoRefresh] Checking for milestone achievements for all users...');
+      await _performanceService.checkAndAnnounceAllUsersMilestones();
     } catch (e) {
       debugPrint('[AutoRefresh] Error checking milestones: $e');
     }

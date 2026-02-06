@@ -135,7 +135,7 @@ class _TeamAnalysisScreenState extends State<TeamAnalysisScreen> {
 
   Color _getRankColor(int rank, BuildContext context) {
     if (!_showMedals) {
-      return Theme.of(context).colorScheme.primary.withOpacity(0.1);
+      return Theme.of(context).colorScheme.primary.withValues(alpha: 0.1);
     }
     
     switch (rank) {
@@ -146,7 +146,7 @@ class _TeamAnalysisScreenState extends State<TeamAnalysisScreen> {
       case 2:
         return const Color(0xFFCD7F32); // Bronze
       default:
-        return Theme.of(context).colorScheme.primary.withOpacity(0.1);
+        return Theme.of(context).colorScheme.primary.withValues(alpha: 0.1);
     }
   }
 
@@ -213,7 +213,7 @@ class _TeamAnalysisScreenState extends State<TeamAnalysisScreen> {
                     'Loading teams...',
                     style: GoogleFonts.inter(
                       fontSize: 14,
-                      color: colorScheme.onSurface.withOpacity(0.6),
+                      color: colorScheme.onSurface.withValues(alpha: 0.6),
                     ),
                   ),
                 ],
@@ -227,7 +227,7 @@ class _TeamAnalysisScreenState extends State<TeamAnalysisScreen> {
                       Icon(
                         Icons.groups_rounded,
                         size: 64,
-                        color: colorScheme.onSurface.withOpacity(0.2),
+                        color: colorScheme.onSurface.withValues(alpha: 0.2),
                       ),
                       const SizedBox(height: 16),
                       Text(
@@ -235,7 +235,7 @@ class _TeamAnalysisScreenState extends State<TeamAnalysisScreen> {
                         style: GoogleFonts.poppins(
                           fontSize: 16,
                           fontWeight: FontWeight.w500,
-                          color: colorScheme.onSurface.withOpacity(0.6),
+                          color: colorScheme.onSurface.withValues(alpha: 0.6),
                         ),
                       ),
                     ],
@@ -256,7 +256,7 @@ class _TeamAnalysisScreenState extends State<TeamAnalysisScreen> {
                           child: Container(
                             padding: const EdgeInsets.all(12),
                             decoration: BoxDecoration(
-                              color: colorScheme.primaryContainer.withOpacity(0.5),
+                              color: colorScheme.primaryContainer.withValues(alpha: 0.5),
                               borderRadius: BorderRadius.circular(12),
                             ),
                             child: Row(
@@ -272,7 +272,7 @@ class _TeamAnalysisScreenState extends State<TeamAnalysisScreen> {
                                   style: GoogleFonts.inter(
                                     fontSize: 13,
                                     fontWeight: FontWeight.w500,
-                                    color: colorScheme.onSurface.withOpacity(0.8),
+                                    color: colorScheme.onSurface.withValues(alpha: 0.8),
                                   ),
                                 ),
                                 const Spacer(),
@@ -415,15 +415,15 @@ class _TeamAnalysisScreenState extends State<TeamAnalysisScreen> {
             borderRadius: BorderRadius.circular(16),
             border: Border.all(
               color: _showMedals && index < 3
-                  ? rankColor.withOpacity(0.3)
-                  : colorScheme.outlineVariant.withOpacity(0.5),
+                  ? rankColor.withValues(alpha: 0.3)
+                  : colorScheme.outlineVariant.withValues(alpha: 0.5),
               width: _showMedals && index < 3 ? 2 : 1,
             ),
             boxShadow: [
               BoxShadow(
                 color: isDark
-                    ? Colors.black.withOpacity(0.3)
-                    : Colors.black.withOpacity(0.05),
+                    ? Colors.black.withValues(alpha: 0.3)
+                    : Colors.black.withValues(alpha: 0.05),
                 blurRadius: 8,
                 offset: const Offset(0, 2),
               ),
@@ -438,10 +438,10 @@ class _TeamAnalysisScreenState extends State<TeamAnalysisScreen> {
                   width: 48,
                   height: 48,
                   decoration: BoxDecoration(
-                    color: rankColor.withOpacity(_showMedals && index < 3 ? 0.2 : 0.1),
+                    color: rankColor.withValues(alpha: _showMedals && index < 3 ? 0.2 : 0.1),
                     borderRadius: BorderRadius.circular(12),
                     border: Border.all(
-                      color: rankColor.withOpacity(_showMedals && index < 3 ? 0.4 : 0.2),
+                      color: rankColor.withValues(alpha: _showMedals && index < 3 ? 0.4 : 0.2),
                       width: 1.5,
                     ),
                   ),
@@ -478,7 +478,7 @@ class _TeamAnalysisScreenState extends State<TeamAnalysisScreen> {
                           Icon(
                             Icons.people_rounded,
                             size: 14,
-                            color: colorScheme.onSurface.withOpacity(0.6),
+                            color: colorScheme.onSurface.withValues(alpha: 0.6),
                           ),
                           const SizedBox(width: 4),
                           Text(
@@ -486,7 +486,7 @@ class _TeamAnalysisScreenState extends State<TeamAnalysisScreen> {
                             style: GoogleFonts.inter(
                               fontSize: 13,
                               fontWeight: FontWeight.w500,
-                              color: colorScheme.onSurface.withOpacity(0.6),
+                              color: colorScheme.onSurface.withValues(alpha: 0.6),
                             ),
                           ),
                         ],
@@ -504,10 +504,10 @@ class _TeamAnalysisScreenState extends State<TeamAnalysisScreen> {
                         vertical: 6,
                       ),
                       decoration: BoxDecoration(
-                        color: attendanceColor.withOpacity(0.15),
+                        color: attendanceColor.withValues(alpha: 0.15),
                         borderRadius: BorderRadius.circular(10),
                         border: Border.all(
-                          color: attendanceColor.withOpacity(0.3),
+                          color: attendanceColor.withValues(alpha: 0.3),
                           width: 1.5,
                         ),
                       ),
@@ -524,7 +524,7 @@ class _TeamAnalysisScreenState extends State<TeamAnalysisScreen> {
                     Icon(
                       Icons.chevron_right_rounded,
                       size: 20,
-                      color: colorScheme.onSurface.withOpacity(0.4),
+                      color: colorScheme.onSurface.withValues(alpha: 0.4),
                     ),
                   ],
                 ),

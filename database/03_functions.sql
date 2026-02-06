@@ -199,7 +199,7 @@ LEFT JOIN (
     WHERE status = 'ABSENT'
     GROUP BY user_id
 ) absent ON u.id = absent.user_id
-WHERE u.roles->>'isStudent' = 'true'
+WHERE (u.roles->>'isStudent')::boolean = true OR (u.roles->>'isPlacementRep')::boolean = true
 ORDER BY u.reg_no;
 
 -- Team Attendance Summary

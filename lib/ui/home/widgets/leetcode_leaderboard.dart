@@ -868,7 +868,7 @@ class _LeetCodeLeaderboardState extends State<LeetCodeLeaderboard>
         ],
       ),
       child: Padding(
-        padding: const EdgeInsets.all(12),
+        padding: const EdgeInsets.all(8),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
@@ -878,7 +878,7 @@ class _LeetCodeLeaderboardState extends State<LeetCodeLeaderboard>
               children: [
                 Container(
                   padding:
-                      const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                      const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                   decoration: BoxDecoration(
                     gradient: isTopPerformer
                         ? const LinearGradient(
@@ -921,8 +921,8 @@ class _LeetCodeLeaderboardState extends State<LeetCodeLeaderboard>
 
             // Avatar
             Container(
-              width: 56,
-              height: 56,
+              width: 48,
+              height: 48,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
                 gradient: LinearGradient(
@@ -985,7 +985,7 @@ class _LeetCodeLeaderboardState extends State<LeetCodeLeaderboard>
 
             // Score
             Container(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
               decoration: BoxDecoration(
                 color: accentColor.withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(14),
@@ -1000,16 +1000,16 @@ class _LeetCodeLeaderboardState extends State<LeetCodeLeaderboard>
                     "${_isWeekly ? user.weeklyScore : user.totalSolved}",
                     style: GoogleFonts.poppins(
                       fontWeight: FontWeight.bold,
-                      fontSize: 24,
+                      fontSize: 20,
                       color: accentColor,
                       height: 1.0,
                     ),
                   ),
-                  const SizedBox(height: 2),
+                  const SizedBox(height: 1),
                   Text(
                     _isWeekly ? "Weekly" : "Total",
                     style: GoogleFonts.inter(
-                      fontSize: 11,
+                      fontSize: 10,
                       fontWeight: FontWeight.w500,
                       color: textSecondary,
                     ),

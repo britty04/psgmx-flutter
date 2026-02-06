@@ -267,7 +267,7 @@ class _TaskCompletionDetailsScreenState
                                       ),
                                       child: Row(
                                         children: [
-                                          Icon(
+                                          const Icon(
                                             Icons.verified_user,
                                             color: Colors.green,
                                             size: 16,

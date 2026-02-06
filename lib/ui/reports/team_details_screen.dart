@@ -139,7 +139,7 @@ class _TeamDetailsScreenState extends State<TeamDetailsScreen> {
                                       color: Colors.blue.withValues(alpha: 0.1),
                                       shape: BoxShape.circle,
                                     ),
-                                    child: Icon(
+                                    child: const Icon(
                                       Icons.groups,
                                       size: 40,
                                       color: Colors.blue,

@@ -204,7 +204,7 @@ class UpdateService extends ChangeNotifier {
       url = _config!.githubReleaseUrl;
     }
 
-    if (url == null || url.isEmpty) {
+    if (url.isEmpty) {
       url = 'https://github.com/psgmx/psgmx-flutter/releases/latest';
     }
 

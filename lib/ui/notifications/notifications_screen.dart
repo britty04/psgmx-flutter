@@ -20,6 +20,10 @@ class _NotificationsScreenState extends State<NotificationsScreen> with SingleTi
   void initState() {
     super.initState();
     _tabController = TabController(length: 3, vsync: this);
+    // Initial fetch
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      Provider.of<NotificationService>(context, listen: false).getNotifications();
+    });
   }
 
   @override
@@ -115,51 +119,42 @@ class _NotificationsScreenState extends State<NotificationsScreen> with SingleTi
           ],
         ),
       ),
-      body: FutureBuilder<List<model.AppNotification>>(
-        future: notifService.getNotifications(),
-        builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator());
+      body: Consumer<NotificationService>(
+        builder: (context, service, child) {
+          // If empty and not loaded, try loading
+          if (service.notifications.isEmpty) {
+             // We can't call getNotifications here directly as it might loop during build
+             // Rely on initState calling it or a dedicated FutureBuilder wrapper if needed.
+             // But simpler: just show what we have, and assume initState triggered a fetch.
           }
-
-          if (snapshot.hasError) {
-            return Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(Icons.error_outline, size: 64, color: colorScheme.error),
-                  const SizedBox(height: 16),
-                  Text(
-                    'Failed to load notifications',
-                    style: GoogleFonts.inter(
-                      fontSize: 16,
-                      color: colorScheme.onSurfaceVariant,
-                    ),
-                  ),
-                ],
-              ),
-            );
-          }
-
-          final allNotifications = snapshot.data ?? [];
           
-          if (allNotifications.isEmpty) {
-            return _EmptyState();
-          }
+          final allNotifications = service.notifications;
 
-          return TabBarView(
-            controller: _tabController,
-            children: [
-              _NotificationList(notifications: allNotifications),
-              _NotificationList(
-                notifications: allNotifications.where((n) => n.isRead == false || n.isRead == null).toList(),
-              ),
-              _NotificationList(
-                notifications: allNotifications
-                    .where((n) => n.type == model.NotificationType.alert)
-                    .toList(),
-              ),
-            ],
+          return RefreshIndicator(
+            onRefresh: service.getNotifications,
+            child: allNotifications.isEmpty
+                ? Stack(
+                    children: [
+                      ListView(), // Allow pull-to-refresh even when empty
+                      _EmptyState(),
+                    ],
+                  )
+                : TabBarView(
+                    controller: _tabController,
+                    children: [
+                      _NotificationList(notifications: allNotifications),
+                      _NotificationList(
+                        notifications: allNotifications
+                            .where((n) => n.isRead == false || n.isRead == null)
+                            .toList(),
+                      ),
+                      _NotificationList(
+                        notifications: allNotifications
+                            .where((n) => n.type == model.NotificationType.alert)
+                            .toList(),
+                      ),
+                    ],
+                  ),
           );
         },
       ),

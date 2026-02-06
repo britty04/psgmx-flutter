@@ -30,6 +30,9 @@ class NotificationService extends ChangeNotifier {
   // Cached notifications from database
   List<AppNotification> _cachedNotifications = [];
   
+  // Public getter for cached notifications
+  List<AppNotification> get notifications => List.unmodifiable(_cachedNotifications);
+  
   // Stream for new notifications (for in-app toasts)
   final _streamController = StreamController<AppNotification>.broadcast();
   Stream<AppNotification> get notificationStream => _streamController.stream;
@@ -349,6 +352,7 @@ class NotificationService extends ChangeNotifier {
       });
 
       _cachedNotifications.removeWhere((n) => n.id == notificationId);
+      notifyListeners();
     } catch (e) {
       debugPrint('[Notification] Error deleting notification: $e');
     }
@@ -376,12 +380,13 @@ class NotificationService extends ChangeNotifier {
         'is_active': true,
       });
 
-      // Show push notification locally as well
+      // Show push notification locally as well (persist to own in-app list)
       await showNotification(
         id: DateTime.now().millisecondsSinceEpoch % 100000,
         title: '📢 $title',
         body: message,
         type: NotificationType.announcement,
+        persistToDatabase: true, // Production-grade: Persist for sender too
       );
 
       return true;
@@ -409,13 +414,14 @@ class NotificationService extends ChangeNotifier {
         'is_active': true,
       });
 
-      // Also show local push notification
+      // Also show local push notification (persist to own in-app list)
       await showNotification(
         id: 200 + birthdayPersonId.hashCode % 1000,
         title: '🎂 Happy Birthday, $firstName!',
         body: 'Let\'s wish $birthdayPersonName a wonderful birthday! 🎉🎈',
         type: NotificationType.announcement,
         channel: 'psgmx_birthday',
+        persistToDatabase: true, // Production-grade: Persist for in-app viewing
       );
 
       return true;
@@ -748,7 +754,67 @@ class NotificationService extends ChangeNotifier {
     String? payload,
     NotificationType type = NotificationType.announcement,
     String channel = 'psgmx_channel_main',
+    bool persistToDatabase = true, // Save to DB for in-app viewing
   }) async {
+    // Persist to database for in-app notification list (production-grade UX)
+    if (persistToDatabase) {
+      try {
+        final user = _supabase.auth.currentUser;
+        if (user != null) {
+          final response = await _supabase.from('notifications').insert({
+            'title': title,
+            'message': body,
+            'notification_type': type.name,
+            'tone': 'friendly',
+            'target_audience': 'user', // Personal notification
+            'created_by': user.id,
+            'is_active': true,
+            'generated_at': DateTime.now().toIso8601String(),
+          }).select().single();
+          
+          // Add to cache with proper DB ID
+          final dbNotif = AppNotification.fromMap(response);
+          _cachedNotifications.insert(0, dbNotif);
+          notifyListeners();
+          
+          debugPrint('[Notification] ✅ Persisted to database: $title');
+        }
+      } catch (e) {
+        debugPrint('[Notification] Failed to persist to DB (falling back to cache only): $e');
+        // Fallback: Add to cache only
+        final transientNotif = AppNotification(
+          id: 'local_${DateTime.now().millisecondsSinceEpoch}',
+          title: title,
+          message: body,
+          notificationType: type,
+          tone: NotificationTone.friendly,
+          targetAudience: 'user',
+          generatedAt: DateTime.now(),
+          isActive: true,
+          createdBy: 'system',
+          isRead: false,
+        );
+        _cachedNotifications.insert(0, transientNotif);
+        notifyListeners();
+      }
+    } else {
+      // Transient notification (not persisted)
+      final transientNotif = AppNotification(
+        id: 'local_${DateTime.now().millisecondsSinceEpoch}',
+        title: title,
+        message: body,
+        notificationType: type,
+        tone: NotificationTone.friendly,
+        targetAudience: 'user',
+        generatedAt: DateTime.now(),
+        isActive: true,
+        createdBy: 'system',
+        isRead: false,
+      );
+      _cachedNotifications.insert(0, transientNotif);
+      notifyListeners();
+    }
+
     if (kIsWeb) {
       debugPrint('[Notification] Web: $title - $body');
       return;
@@ -813,6 +879,7 @@ class NotificationService extends ChangeNotifier {
       body:
           'Stay updated with announcements, reminders, and important updates!',
       type: NotificationType.announcement,
+      persistToDatabase: true, // Save to in-app list
     );
   }
 
@@ -885,6 +952,18 @@ class NotificationService extends ChangeNotifier {
       );
 
       debugPrint('[Notification] Task deadline reminder scheduled for 9 PM');
+      
+      // Also schedule task incomplete check at 9:15 PM (15 min after deadline)
+      await _scheduleDaily(
+        id: 401,
+        title: '⏰ Task Still Pending',
+        body: 'You haven\'t marked today\'s task as completed yet. Take a moment to finish it!',
+        hour: 21,
+        minute: 15,
+        channel: 'psgmx_channel_main',
+      );
+      
+      debugPrint('[Notification] Task incomplete check scheduled for 9:15 PM');
     } catch (e) {
       debugPrint('[Notification] Error scheduling task reminder: $e');
     }
@@ -954,7 +1033,9 @@ class NotificationService extends ChangeNotifier {
   }
 
   /// Cleanup subscriptions
+  @override
   void dispose() {
     _notificationChannel?.unsubscribe();
+    super.dispose();
   }
 }

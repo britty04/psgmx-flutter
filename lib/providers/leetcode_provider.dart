@@ -3,6 +3,7 @@ import 'package:http/http.dart' as http;
 import 'package:flutter/foundation.dart';
 import '../models/leetcode_stats.dart';
 import '../services/supabase_service.dart';
+import '../services/notification_service.dart';
 
 class LeetCodeProvider extends ChangeNotifier {
   final SupabaseService _supabaseService;
@@ -225,6 +226,9 @@ class LeetCodeProvider extends ChangeNotifier {
     try {
       // Just fetch from database - fast and no network calls
       await fetchAllUsers();
+      
+      // Check and notify POTD (run in background)
+      checkAndNotifyPOTD();
     } catch (e) {
       debugPrint('Error loading users from database: $e');
     } finally {
@@ -293,8 +297,8 @@ class LeetCodeProvider extends ChangeNotifier {
     int failCount = 0;
     int consecutiveFailures = 0;
     
-    // Dynamic delay base
-    int currentDelayMs = kIsWeb ? 2500 : 2000; // Slower on web to avoid 429s
+    // Dynamic delay base - Increased for both platforms due to aggressive rate limiting
+    int currentDelayMs = kIsWeb ? 4000 : 3000;
     
     for (var i = 0; i < usernames.length; i++) {
       final username = usernames[i];
@@ -304,6 +308,7 @@ class LeetCodeProvider extends ChangeNotifier {
         notifyListeners();
         
         // Rate limiting with dynamic backoff
+        // Actually WAIT here.
         await Future.delayed(Duration(milliseconds: currentDelayMs));
         
         final stats = await _fetchFromLeetCodeApi(username); 
@@ -313,9 +318,9 @@ class LeetCodeProvider extends ChangeNotifier {
           successCount++;
           consecutiveFailures = 0;
           
-          // Reset delay on success (gradually)
-          if (currentDelayMs > 2000) {
-            currentDelayMs -= 100;
+          // Reset delay on success (gradually) but keep it safe
+          if (currentDelayMs > (kIsWeb ? 4000 : 3000)) {
+            currentDelayMs -= 500;
           }
           
           // Notify UI every 5 users for progressive loading
@@ -329,16 +334,27 @@ class LeetCodeProvider extends ChangeNotifier {
           debugPrint('[LeetCode] ⚠️  Failed to fetch: $username');
           
           // Exponential backoff if failing repeatedly (likely rate limit)
-          if (consecutiveFailures >= 3) {
+          if (consecutiveFailures >= 2) {
+             // 5s, 7.5s, 11s, 16s...
             currentDelayMs = (currentDelayMs * 1.5).toInt();
-            // Cap at 10 seconds
-            if (currentDelayMs > 10000) currentDelayMs = 10000;
+            // Cap at 30 seconds (longer wait if blocked)
+            if (currentDelayMs > 30000) currentDelayMs = 30000;
             debugPrint('[LeetCode] ⏳ Increasing delay to ${currentDelayMs}ms due to failures');
+            
+            // If we are hitting 429s, maybe we should pause for a big chunk
+             if (consecutiveFailures >= 5) {
+                 debugPrint('[LeetCode] 🛑 Too many failures, pausing for 60 seconds...');
+                 await Future.delayed(const Duration(seconds: 60));
+                 consecutiveFailures = 2; // Reset slightly
+                 currentDelayMs = 5000; // Reset to safe slow speed
+             }
           }
         }
       } catch (e) {
         debugPrint('[LeetCode] ❌ Error fetching $username: $e');
         failCount++;
+        // If error is 429 directly caught (though usually it returns null)
+        await Future.delayed(const Duration(seconds: 5));
       }
     }
     
@@ -371,12 +387,8 @@ class LeetCodeProvider extends ChangeNotifier {
 
 
   Future<LeetCodeStats?> _fetchFromLeetCodeApi(String username) async {
-    // On Web, skip official API because of CORS
-    if (kIsWeb) {
-      return await _fetchFromAlphaApi(username);
-    }
-
-    // Try official LeetCode GraphQL API first
+    // Try official LeetCode GraphQL API first (even on Web, trying to use CORS bypass or proxy if available)
+    // Users requested to prioritize this over Alpha API to avoid rate limits
     final stats = await _fetchFromOfficialApi(username);
     if (stats != null) return stats;
     
@@ -386,27 +398,32 @@ class LeetCodeProvider extends ChangeNotifier {
 
   Future<LeetCodeStats?> _fetchFromOfficialApi(String username) async {
     try {
-      // Use official LeetCode GraphQL API (same as Kotlin implementation)
+      // Use official LeetCode GraphQL API with User's requested query
       const url = 'https://leetcode.com/graphql';
       
-      // GraphQL query matching the Kotlin implementation
       const query = '''
         query getUserProfile(\$username: String!) {
           matchedUser(username: \$username) {
             username
             profile {
               realName
+              aboutMe
               userAvatar
               ranking
             }
-            submitStats: submitStatsGlobal {
+            submitStatsGlobal {
               acSubmissionNum {
                 difficulty
                 count
-                submissions
               }
             }
-            submissionCalendar
+            languageProblemCount {
+              languageName
+              problemsSolved
+            }
+            userCalendar {
+              submissionCalendar
+            }
           }
         }
       ''';
@@ -428,9 +445,8 @@ class LeetCodeProvider extends ChangeNotifier {
       if (response.statusCode == 200) {
         final body = jsonDecode(response.body);
         
-        // Check for GraphQL errors
         if (body['errors'] != null) {
-          debugPrint('[LeetCode] ⚠️  GraphQL Error for $username, trying Alpha API');
+          debugPrint('[LeetCode] ⚠️  GraphQL Error for $username: ${body['errors'][0]['message']}');
           return null;
         }
 
@@ -440,8 +456,8 @@ class LeetCodeProvider extends ChangeNotifier {
           return null;
         }
 
-        // Parse submission stats
-        final submitStats = matchedUser['submitStats']['acSubmissionNum'] as List;
+        // Parse stats
+        final submitStats = matchedUser['submitStatsGlobal']['acSubmissionNum'] as List;
         int totalSolved = 0;
         int easySolved = 0;
         int mediumSolved = 0;
@@ -470,9 +486,11 @@ class LeetCodeProvider extends ChangeNotifier {
         final ranking = matchedUser['profile']['ranking'] as int? ?? 0;
         final profilePicture = matchedUser['profile']['userAvatar'] as String?;
 
-        // Calculate weekly score from submission calendar
+        // Calculate weekly score
         int weeklyScore = 0;
-        final submissionCalendarStr = matchedUser['submissionCalendar'] as String?;
+        // User query structure has submissionCalendar inside userCalendar
+        final submissionCalendarStr = matchedUser['userCalendar']?['submissionCalendar'] as String?;
+        
         if (submissionCalendarStr != null && submissionCalendarStr.isNotEmpty) {
           try {
             final submissionCalendar = jsonDecode(submissionCalendarStr) as Map<String, dynamic>;
@@ -489,7 +507,7 @@ class LeetCodeProvider extends ChangeNotifier {
                   }
                 }
               } catch (e) {
-                // Skip invalid entries
+                // Skip
               }
             });
           } catch (e) {
@@ -497,7 +515,7 @@ class LeetCodeProvider extends ChangeNotifier {
           }
         }
 
-        debugPrint('[LeetCode] ✅ [Official API] $username: $totalSolved problems (E:$easySolved M:$mediumSolved H:$hardSolved) ${profilePicture != null ? '🖼️' : ''}');
+        debugPrint('[LeetCode] ✅ [Official API] $username: $totalSolved problems (E:$easySolved M:$mediumSolved H:$hardSolved)');
         
         final stats = LeetCodeStats(
           username: username,
@@ -511,16 +529,97 @@ class LeetCodeProvider extends ChangeNotifier {
           lastUpdated: DateTime.now(),
         );
 
-        // Save to database immediately
         await _saveToDatabase(stats);
         return stats;
       } else {
-        debugPrint('[LeetCode] ⚠️  Official API returned ${response.statusCode} for $username');
+        debugPrint('[LeetCode] ⚠️  Official API returned ${response.statusCode}');
         return null;
       }
     } catch (e) {
-      debugPrint('[LeetCode] ⚠️  Official API Exception for $username: $e');
+      debugPrint('[LeetCode] ⚠️  Official API Exception: $e');
       return null;
+    }
+  }
+
+  /// Fetch Problem of the Day
+  Future<Map<String, dynamic>?> fetchPOTD() async {
+    try {
+      const url = 'https://leetcode.com/graphql';
+      const query = '''
+        query questionOfToday {
+          activeDailyCodingChallengeQuestion {
+            date
+            link
+            question {
+              title
+              titleSlug
+              difficulty
+              acRate
+            }
+          }
+        }
+      ''';
+
+      final response = await http.post(
+        Uri.parse(url),
+        headers: {
+          'Content-Type': 'application/json',
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+          'Referer': 'https://leetcode.com',
+          'Origin': 'https://leetcode.com',
+        },
+        body: jsonEncode({'query': query}),
+      ).timeout(const Duration(seconds: 10));
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        final question = data['data']?['activeDailyCodingChallengeQuestion'];
+        if (question != null) {
+             final q = question['question'];
+             return {
+               'title': q['title'],
+               'link': question['link'],
+               'difficulty': q['difficulty'],
+               'acRate': '${double.parse(q['acRate'].toString()).toStringAsFixed(1)}%'
+             };
+        }
+      }
+      return null;
+    } catch (e) {
+      debugPrint('[LeetCode] Error fetching POTD: $e');
+      return null;
+    }
+  }
+
+  /// Check for POTD and send notification if enabled
+  Future<void> checkAndNotifyPOTD() async {
+    try {
+      // Check user preference
+      final user = _supabaseService.client.auth.currentUser;
+      if (user == null) return;
+      
+      final userData = await _supabaseService.client
+          .from('users')
+          .select('leetcode_notifications_enabled')
+          .eq('id', user.id)
+          .maybeSingle();
+          
+      if (userData == null || userData['leetcode_notifications_enabled'] != true) {
+        return; // Notifications disabled
+      }
+
+      final potd = await fetchPOTD();
+      if (potd != null) {
+        await NotificationService().showNotification(
+          id: 9999, // Fixed ID for daily updates
+          title: 'LeetCode POTD: ${potd['title']}',
+          body: '${potd['difficulty']} • AR: ${potd['acRate']}',
+          payload: 'https://leetcode.com${potd['link']}',
+        );
+        debugPrint('[LeetCode] POTD Notification Sent: ${potd['title']}');
+      }
+    } catch (e) {
+      debugPrint('[LeetCode] Failed to notify POTD: $e');
     }
   }
 

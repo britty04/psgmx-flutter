@@ -20,8 +20,9 @@ class AttendanceDay {
     return AttendanceDay(
       date: DateTime.parse(data['date']),
       isWorkingDay: data['is_working_day'] ?? true,
-      decidedBy: data['decided_by'],
-      reason: data['reason'],
+      // Handle both legacy (attendance_days) and new (scheduled_attendance_dates) column names
+      decidedBy: data['decided_by'] ?? data['scheduled_by'],
+      reason: data['reason'] ?? data['notes'],
       createdAt: data['created_at'] != null
           ? DateTime.parse(data['created_at'])
           : DateTime.now(),
