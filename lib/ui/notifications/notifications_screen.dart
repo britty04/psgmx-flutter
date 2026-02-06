@@ -371,6 +371,12 @@ class _NotificationCard extends StatelessWidget {
         return colorScheme.primary;
       case model.NotificationType.announcement:
         return colorScheme.secondary;
+      case model.NotificationType.leetcode:
+        return Colors.orange;
+      case model.NotificationType.birthday:
+        return Colors.pinkAccent;
+      case model.NotificationType.attendance:
+        return Colors.indigoAccent;
     }
   }
 
@@ -384,6 +390,12 @@ class _NotificationCard extends StatelessWidget {
         return Icons.schedule_rounded;
       case model.NotificationType.announcement:
         return Icons.campaign_rounded;
+      case model.NotificationType.leetcode:
+        return Icons.code_rounded;
+      case model.NotificationType.birthday:
+        return Icons.cake_rounded;
+      case model.NotificationType.attendance:
+        return Icons.how_to_reg_rounded;
     }
   }
 

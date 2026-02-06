@@ -615,10 +615,19 @@ class _TaskPremiumCard extends StatelessWidget {
                 children: [
                   InkWell(
                     onTap: () async {
-                      final uri = Uri.parse(content);
-                      if (await canLaunchUrl(uri)) {
-                        await launchUrl(uri,
-                            mode: LaunchMode.externalApplication);
+                      try {
+                        final uri = Uri.parse(content);
+                        if (!await launchUrl(uri,
+                            mode: LaunchMode.externalApplication)) {
+                          throw 'Could not launch $content';
+                        }
+                      } catch (e) {
+                        if (context.mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                                content: Text('Could not open link: $e')),
+                          );
+                        }
                       }
                     },
                     borderRadius: BorderRadius.circular(AppRadius.md),
@@ -1146,9 +1155,18 @@ class _TaskManagementCard extends StatelessWidget {
               const SizedBox(height: 8),
               InkWell(
                 onTap: () async {
-                  final uri = Uri.parse(task.referenceLink!);
-                  if (await canLaunchUrl(uri)) {
-                    await launchUrl(uri, mode: LaunchMode.externalApplication);
+                  try {
+                    final uri = Uri.parse(task.referenceLink!);
+                    if (!await launchUrl(uri,
+                        mode: LaunchMode.externalApplication)) {
+                      throw 'Could not launch ${task.referenceLink}';
+                    }
+                  } catch (e) {
+                    if (context.mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(content: Text('Could not open link: $e')),
+                      );
+                    }
                   }
                 },
                 child: Row(

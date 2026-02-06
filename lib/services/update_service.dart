@@ -205,7 +205,7 @@ class UpdateService extends ChangeNotifier {
     }
 
     if (url.isEmpty) {
-      url = 'https://github.com/psgmx/psgmx-flutter/releases/latest';
+      url = 'https://github.com/brittytino/psgmx-flutter/releases/latest';
     }
 
     try {

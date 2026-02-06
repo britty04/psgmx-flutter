@@ -60,6 +60,7 @@ class AnnouncementProvider extends ChangeNotifier {
     if (user == null) return;
 
     try {
+      // 1. Insert into announcements table for home feed
       await _supabaseService.client.from('announcements').insert({
         'title': title,
         'message': message,
@@ -67,6 +68,19 @@ class AnnouncementProvider extends ChangeNotifier {
         'expiry_date': expiry?.toIso8601String(),
         'created_by': user.id,
       });
+
+      // 2. If priority, trigger a system-wide notification
+      if (isPriority) {
+        await _supabaseService.client.from('notifications').insert({
+          'title': title,
+          'message': message,
+          'notification_type': 'announcement',
+          'tone': 'friendly',
+          'target_audience': 'all',
+          'created_by': user.id,
+          'generated_at': DateTime.now().toIso8601String(),
+        });
+      }
 
       // Refresh list
       await fetchAnnouncements(forceRefresh: true);

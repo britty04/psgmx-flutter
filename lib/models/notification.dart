@@ -2,7 +2,10 @@ enum NotificationType {
   motivation,
   reminder,
   alert,
-  announcement;
+  announcement,
+  leetcode,
+  birthday,
+  attendance;
 
   String get displayName {
     switch (this) {
@@ -14,6 +17,12 @@ enum NotificationType {
         return 'Alert';
       case NotificationType.announcement:
         return 'Announcement';
+      case NotificationType.leetcode:
+        return 'LeetCode';
+      case NotificationType.birthday:
+        return 'Birthday';
+      case NotificationType.attendance:
+        return 'Attendance';
     }
   }
 
@@ -27,6 +36,12 @@ enum NotificationType {
         return NotificationType.alert;
       case 'announcement':
         return NotificationType.announcement;
+      case 'leetcode':
+        return NotificationType.leetcode;
+      case 'birthday':
+        return NotificationType.birthday;
+      case 'attendance':
+        return NotificationType.attendance;
       default:
         return NotificationType.announcement;
     }

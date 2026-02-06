@@ -531,7 +531,7 @@ class HelpSupportScreen extends StatelessWidget {
           ),
           const SizedBox(height: 16),
           Text(
-            'Version 1.2.0',
+            'Version 2.2.4',
             style: GoogleFonts.inter(
               fontSize: 12,
               color: Colors.grey[500],
@@ -578,12 +578,22 @@ class HelpSupportScreen extends StatelessWidget {
       'https://github.com/brittytino/psgmx-flutter/issues/new?labels=$label&title=$title',
     );
 
-    if (await canLaunchUrl(url)) {
-      await launchUrl(url, mode: LaunchMode.externalApplication);
-    } else {
+    try {
+      if (await canLaunchUrl(url)) {
+        await launchUrl(url, mode: LaunchMode.externalApplication);
+      } else {
+        // Fallback to profile if specific issue page fails
+        final Uri profileUrl = Uri.parse('https://github.com/brittytino');
+        if (await canLaunchUrl(profileUrl)) {
+          await launchUrl(profileUrl, mode: LaunchMode.externalApplication);
+        } else {
+          throw 'Could not launch GitHub';
+        }
+      }
+    } catch (e) {
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Could not open GitHub')),
+          SnackBar(content: Text('Could not open GitHub: $e')),
         );
       }
     }
@@ -592,19 +602,21 @@ class HelpSupportScreen extends StatelessWidget {
   Future<void> _launchEmail(BuildContext context) async {
     final Uri emailUri = Uri(
       scheme: 'mailto',
-      path: 'placement.psgmx@gmail.com',
+      path: 'brittytino08@gmail.com',
       queryParameters: {
         'subject': 'PSGMX App Support',
         'body': 'Hello,\n\nI need help with:\n\n[Describe your issue here]\n\nThank you.',
       },
     );
     
-    if (await canLaunchUrl(emailUri)) {
-      await launchUrl(emailUri);
-    } else {
+    try {
+      if (!await launchUrl(emailUri)) {
+        throw 'Could not launch email app';
+      }
+    } catch (e) {
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Could not open email app')),
+          const SnackBar(content: Text('Could not open email app. Please email brittytino08@gmail.com directly.')),
         );
       }
     }
@@ -743,7 +755,7 @@ class HelpSupportScreen extends StatelessWidget {
         content: SingleChildScrollView(
           child: Text(
             'PSGMX Privacy Policy\n\n'
-            'Last updated: January 2026\n\n'
+            'Last updated: February 2026\n\n'
             '1. Data Collection\n'
             'We collect only essential information needed for the app\'s functionality:\n'
             '• Email address (PSG college email)\n'
@@ -766,7 +778,7 @@ class HelpSupportScreen extends StatelessWidget {
             'We do not sell or share your data with third parties.\n'
             'LeetCode statistics are fetched from public APIs.\n\n'
             '5. Contact\n'
-            'For privacy concerns, contact: placement.psgmx@gmail.com',
+            'For privacy concerns, contact: brittytino08@gmail.com',
             style: GoogleFonts.inter(fontSize: 12, height: 1.6),
           ),
         ),
@@ -788,7 +800,7 @@ class HelpSupportScreen extends StatelessWidget {
         content: SingleChildScrollView(
           child: Text(
             'PSGMX Terms of Service\n\n'
-            'Last updated: January 2026\n\n'
+            'Last updated: February 2026\n\n'
             '1. Acceptance\n'
             'By using PSGMX, you agree to these terms.\n\n'
             '2. Eligibility\n'
@@ -809,7 +821,7 @@ class HelpSupportScreen extends StatelessWidget {
             '6. Modifications\n'
             'We may update these terms. Continued use implies acceptance.\n\n'
             '7. Contact\n'
-            'Questions? Email: placement.psgmx@gmail.com',
+            'Questions? Email: brittytino08@gmail.com',
             style: GoogleFonts.inter(fontSize: 12, height: 1.6),
           ),
         ),

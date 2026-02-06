@@ -161,7 +161,23 @@ class NotificationService extends ChangeNotifier {
   /// Handle new notification from real-time subscription
   void _handleNewNotification(Map<String, dynamic> data) async {
     try {
+      final user = _supabase.auth.currentUser;
+      if (user == null) return;
+
       final notification = AppNotification.fromMap(data);
+
+      // Audence check: Skip if not for this user
+      final audience = notification.targetAudience;
+      if (audience != 'all' && audience != user.id) {
+        // In a more complex system, we'd check roles (e.g., audience == 'coordinators')
+        // For now, we handle 'all' and specific user IDs
+        return;
+      }
+
+      // Deduplication: Skip if already in cache
+      if (_cachedNotifications.any((n) => n.id == notification.id)) {
+        return;
+      }
 
       // Add to cache
       _cachedNotifications.insert(0, notification);
@@ -171,6 +187,12 @@ class NotificationService extends ChangeNotifier {
       
       // Add to stream for toasts
       _streamController.add(notification);
+
+      // Avoid showing push notification if the sender is current user
+      // (Sender already saw/triggered the local notification)
+      if (notification.createdBy == user.id) {
+        return;
+      }
 
       // Show push notification
       await _showPushNotification(notification);
@@ -863,6 +885,12 @@ class NotificationService extends ChangeNotifier {
         return '⏰ Reminder';
       case NotificationType.announcement:
         return '📢 Announcement';
+      case NotificationType.leetcode:
+        return '💻 LeetCode';
+      case NotificationType.birthday:
+        return '🎂 Birthday';
+      case NotificationType.attendance:
+        return '📋 Attendance';
     }
   }
 

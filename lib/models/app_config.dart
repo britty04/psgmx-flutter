@@ -54,7 +54,7 @@ class AppConfig {
       latestVersion: '1.0.0',
       forceUpdate: false,
       updateMessage: 'A new version is available.',
-      githubReleaseUrl: 'https://github.com/psgmx/psgmx-flutter/releases/latest',
+      githubReleaseUrl: 'https://github.com/brittytino/psgmx-flutter/releases/latest',
       emergencyBlock: false,
       emergencyMessage: 'App temporarily unavailable.',
     );
@@ -68,7 +68,7 @@ class AppConfig {
       forceUpdate: map['force_update'] as bool? ?? false,
       updateMessage: map['update_message'] as String? ?? 'A new version is available.',
       githubReleaseUrl: map['github_release_url'] as String? ?? 
-          'https://github.com/psgmx/psgmx-flutter/releases/latest',
+          'https://github.com/brittytino/psgmx-flutter/releases/latest',
       androidDownloadUrl: map['android_download_url'] as String?,
       iosDownloadUrl: map['ios_download_url'] as String?,
       emergencyBlock: map['emergency_block'] as bool? ?? false,

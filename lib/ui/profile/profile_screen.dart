@@ -272,7 +272,7 @@ class ProfileScreen extends StatelessWidget {
                 
                 const Center(
                    child: Text(
-                     "PSGMX - Placement Excellence v1.2.0", 
+                     "PSGMX - Placement Excellence v2.2.4", 
                      style: TextStyle(color: Colors.grey, fontSize: 10)
                    )
                 ),
