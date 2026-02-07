@@ -113,8 +113,9 @@ class AuthService {
       debugPrint('[AuthService] User authenticated: ${user.email}');
       debugPrint('[AuthService] User ID: ${user.id}');
 
-      // Profile should already exist with matching UUID
-      // No need to create or check - UserProvider will fetch it
+      // Production-grade: Sync profile from whitelist if it doesn't exist
+      await _syncProfileFromWhitelist(user.id, email);
+
       debugPrint('[AuthService] ✅ Login complete for: $email');
 
     } on AuthException catch (e) {
@@ -150,6 +151,57 @@ class AuthService {
     } catch (e) {
       debugPrint('[AuthService] ❌ Error fetching profile: $e');
       return null;
+    }
+  }
+
+  /// Production-grade: Ensures the user has a profile in the 'users' table.
+  /// Fetches data from whitelist and inserts into users on first login.
+  Future<void> _syncProfileFromWhitelist(String userId, String email) async {
+    try {
+      // 1. Check if profile already exists
+      final existing = await _supabaseService.client
+          .from('users')
+          .select('id')
+          .eq('id', userId)
+          .maybeSingle();
+      
+      if (existing != null) {
+        debugPrint('[AuthService] Profile already exists for $email');
+        return;
+      }
+
+      debugPrint('[AuthService] First login detected. Creating profile from whitelist for $email...');
+
+      // 2. Get data from whitelist
+      final whitelistData = await _supabaseService.client
+          .from('whitelist')
+          .select()
+          .eq('email', email)
+          .maybeSingle();
+      
+      if (whitelistData == null) {
+        debugPrint('[AuthService] ⚠️ User signed in but not found in whitelist. This should not happen.');
+        return;
+      }
+
+      // 3. Insert into users table
+      await _supabaseService.client.from('users').insert({
+        'id': userId,
+        'email': email,
+        'name': whitelistData['name'],
+        'reg_no': whitelistData['reg_no'],
+        'team_id': whitelistData['team_id'],
+        'batch': whitelistData['batch'] ?? 'G1',
+        'roles': whitelistData['roles'] ?? {'isStudent': true},
+        'leetcode_username': whitelistData['leetcode_username'],
+        'dob': whitelistData['dob'],
+      });
+
+      debugPrint('[AuthService] ✅ Profile created successfully for $email');
+    } catch (e) {
+      debugPrint('[AuthService] ❌ Error syncing profile from whitelist: $e');
+      // We don't throw here to avoid blocking login if profile creation fails,
+      // though it might lead to issues later. In a real app, maybe retry.
     }
   }
 

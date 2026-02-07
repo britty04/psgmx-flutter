@@ -37,7 +37,10 @@ class AttendanceActionCard extends StatelessWidget {
                 Text(
                   'Action required for today',
                   style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                     color: Theme.of(context).colorScheme.onPrimaryContainer.withValues(alpha: 0.8),
+                    color: Theme.of(context)
+                        .colorScheme
+                        .onPrimaryContainer
+                        .withValues(alpha: 0.8),
                   ),
                 ),
               ],

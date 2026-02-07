@@ -112,9 +112,13 @@ class _StudentTasksViewState extends State<_StudentTasksView> {
                 isToday: isToday,
                 completionService: _completionService,
                 isLoading: _isMarkingComplete,
-                onMarkComplete: isToday ? () => _markTaskComplete(true) : null,
+                onMarkComplete: (isToday || _selectedDate.isBefore(DateTime.now())) 
+                    ? () => _markTaskComplete(true) 
+                    : null,
                 onMarkIncomplete:
-                    isToday ? () => _markTaskComplete(false) : null,
+                    (isToday || _selectedDate.isBefore(DateTime.now())) 
+                        ? () => _markTaskComplete(false) 
+                        : null,
               ),
             ),
           ),
@@ -338,14 +342,38 @@ class _TaskCompletionCard extends StatelessWidget {
                       if (isCompleted && completion?.completedAt != null)
                         Padding(
                           padding: const EdgeInsets.only(top: 2),
-                          child: Text(
-                            'at ${DateFormat('h:mm a').format(completion!.completedAt!)}',
-                            style:
-                                Theme.of(context).textTheme.bodySmall?.copyWith(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'at ${DateFormat('MMM d, h:mm a').format(completion!.completedAt!)}',
+                                style: Theme.of(context).textTheme.bodySmall?.copyWith(
                                       color: Theme.of(context)
                                           .colorScheme
                                           .onSurfaceVariant,
                                     ),
+                              ),
+                              if (!DateUtils.isSameDay(completion.completedAt, date) && 
+                                  completion.completedAt!.isAfter(date))
+                                Container(
+                                  margin: const EdgeInsets.only(top: 4),
+                                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                  decoration: BoxDecoration(
+                                    color: Colors.amber.withValues(alpha: 0.1),
+                                    borderRadius: BorderRadius.circular(4),
+                                    border: Border.all(color: Colors.amber.withValues(alpha: 0.3)),
+                                  ),
+                                  child: const Text(
+                                    'TURNED IN LATE',
+                                    style: TextStyle(
+                                      color: Colors.orange,
+                                      fontSize: 9,
+                                      fontWeight: FontWeight.bold,
+                                      letterSpacing: 0.5,
+                                    ),
+                                  ),
+                                ),
+                            ],
                           ),
                         ),
                     ],
@@ -359,7 +387,7 @@ class _TaskCompletionCard extends StatelessWidget {
                     height: 24,
                     child: CircularProgressIndicator(strokeWidth: 2),
                   )
-                else if (isToday)
+                else
                   isCompleted
                       ? IconButton(
                           icon: const Icon(Icons.undo, size: 20),
@@ -370,29 +398,13 @@ class _TaskCompletionCard extends StatelessWidget {
                       : FilledButton.icon(
                           onPressed: onMarkComplete,
                           icon: const Icon(Icons.check, size: 18),
-                          label: const Text('Done'),
+                          label: Text(isPastDate ? 'Complete Late' : 'Done'),
                           style: FilledButton.styleFrom(
-                            backgroundColor: Colors.green,
+                            backgroundColor: isPastDate ? Colors.orange : Colors.green,
                             foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                           ),
-                        )
-                else if (isPastDate && !isCompleted)
-                  Container(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                    decoration: BoxDecoration(
-                      color: Colors.red.withValues(alpha: 0.1),
-                      borderRadius: BorderRadius.circular(AppRadius.sm),
-                    ),
-                    child: const Text(
-                      'Missed',
-                      style: TextStyle(
-                        color: Colors.red,
-                        fontSize: 12,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ),
+                        ),
               ],
             ),
           ),
@@ -1652,7 +1664,7 @@ class _TeamVerificationViewState extends State<_TeamVerificationView> {
       // Get task completions for this date
       final completionsResponse = await supabase
           .from('task_completions')
-          .select('user_id, completed, verified_by, verified_at')
+          .select('user_id, completed, completed_at, verified_by, verified_at')
           .eq('task_date', dateStr)
           .inFilter('user_id', members.map((m) => m['id']).toList());
 
@@ -1668,6 +1680,7 @@ class _TeamVerificationViewState extends State<_TeamVerificationView> {
           'name': member['name'],
           'reg_no': member['reg_no'],
           'is_completed': completion?['completed'] ?? false,
+          'completed_at': completion?['completed_at'],
           'verified_by': completion?['verified_by'],
           'verified_at': completion?['verified_at'],
         };
@@ -1698,14 +1711,22 @@ class _TeamVerificationViewState extends State<_TeamVerificationView> {
 
       final supabase = Supabase.instance.client;
 
+      // Find if there's an existing completion to preserve the student's completion time
+      final existing = _teamMembers.firstWhere((m) => m['id'] == studentId);
+      final existingCompletedAt = existing['completed_at'];
+
       // Upsert task completion with verification
       await supabase.from('task_completions').upsert({
         'user_id': studentId,
         'task_date': dateStr,
         'completed': isCompleted,
-        'completed_at': isCompleted ? DateTime.now().toIso8601String() : null,
+        // Preserve original completion time if it exists and we're marking as completed
+        'completed_at': isCompleted 
+            ? (existingCompletedAt ?? DateTime.now().toIso8601String())
+            : null,
         'verified_by': verifierId,
         'verified_at': DateTime.now().toIso8601String(),
+        'updated_at': DateTime.now().toIso8601String(),
       }, onConflict: 'user_id,task_date');
 
       if (mounted) {
@@ -1715,6 +1736,7 @@ class _TeamVerificationViewState extends State<_TeamVerificationView> {
                 ? 'Task verified as completed'
                 : 'Task marked as incomplete'),
             backgroundColor: isCompleted ? Colors.green : Colors.orange,
+            behavior: SnackBarBehavior.floating,
           ),
         );
         await _loadTeamData();
@@ -1723,7 +1745,7 @@ class _TeamVerificationViewState extends State<_TeamVerificationView> {
       debugPrint('[TeamVerification] Error verifying task: $e');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error: $e')),
+          SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
         );
       }
     }
@@ -1731,8 +1753,6 @@ class _TeamVerificationViewState extends State<_TeamVerificationView> {
 
   @override
   Widget build(BuildContext context) {
-    final isToday = DateUtils.isSameDay(_selectedDate, DateTime.now());
-
     return Column(
       children: [
         // Date Navigator
@@ -1814,14 +1834,22 @@ class _TeamVerificationViewState extends State<_TeamVerificationView> {
                                                 fontSize: 16,
                                               ),
                                             ),
-                                            Text(
-                                              member['reg_no'],
-                                              style: TextStyle(
-                                                fontSize: 12,
-                                                color: Theme.of(context)
-                                                    .colorScheme
-                                                    .onSurfaceVariant,
-                                              ),
+                                            Row(
+                                              children: [
+                                                Text(
+                                                  member['reg_no'],
+                                                  style: TextStyle(
+                                                    fontSize: 12,
+                                                    color: Theme.of(context)
+                                                        .colorScheme
+                                                        .onSurfaceVariant,
+                                                  ),
+                                                ),
+                                                if (member['completed_at'] != null) ...[
+                                                  const SizedBox(width: 8),
+                                                  _buildLateBadge(member['completed_at'], _selectedDate),
+                                                ],
+                                              ],
                                             ),
                                           ],
                                         ),
@@ -1864,9 +1892,7 @@ class _TeamVerificationViewState extends State<_TeamVerificationView> {
                                     children: [
                                       Expanded(
                                         child: OutlinedButton.icon(
-                                          onPressed: isToday
-                                              ? () => _verifyTask(member['id'], true)
-                                              : null,
+                                          onPressed: () => _verifyTask(member['id'], true),
                                           icon: Icon(
                                             isCompleted
                                                 ? Icons.check_circle
@@ -1891,11 +1917,9 @@ class _TeamVerificationViewState extends State<_TeamVerificationView> {
                                       const SizedBox(width: AppSpacing.sm),
                                       Expanded(
                                         child: OutlinedButton.icon(
-                                          onPressed: isToday
-                                              ? () => _verifyTask(member['id'], false)
-                                              : null,
+                                          onPressed: () => _verifyTask(member['id'], false),
                                           icon: Icon(
-                                            !isCompleted
+                                            !isCompleted && isVerified
                                                 ? Icons.cancel
                                                 : Icons.cancel_outlined,
                                             size: 18,
@@ -1904,12 +1928,12 @@ class _TeamVerificationViewState extends State<_TeamVerificationView> {
                                           style: OutlinedButton.styleFrom(
                                             foregroundColor: Colors.orange,
                                             side: BorderSide(
-                                              color: !isCompleted
+                                              color: !isCompleted && isVerified
                                                   ? Colors.orange
                                                   : Colors.grey.shade300,
-                                              width: !isCompleted ? 2 : 1,
+                                              width: !isCompleted && isVerified ? 2 : 1,
                                             ),
-                                            backgroundColor: !isCompleted
+                                            backgroundColor: !isCompleted && isVerified
                                                 ? Colors.orange.withValues(alpha: 0.1)
                                                 : null,
                                           ),
@@ -1927,6 +1951,33 @@ class _TeamVerificationViewState extends State<_TeamVerificationView> {
         ),
       ],
     );
+  }
+
+  Widget _buildLateBadge(String? completedAtStr, DateTime taskDate) {
+    if (completedAtStr == null) return const SizedBox.shrink();
+    
+    final completedAt = DateTime.parse(completedAtStr);
+    // If completed on a different day and AFTER the task date
+    if (!DateUtils.isSameDay(completedAt, taskDate) && 
+        completedAt.isAfter(taskDate)) {
+      return Container(
+        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+        decoration: BoxDecoration(
+          color: Colors.amber.withValues(alpha: 0.1),
+          borderRadius: BorderRadius.circular(4),
+          border: Border.all(color: Colors.amber.withValues(alpha: 0.3)),
+        ),
+        child: const Text(
+          'LATE',
+          style: TextStyle(
+            color: Colors.orange,
+            fontSize: 9,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+      );
+    }
+    return const SizedBox.shrink();
   }
 }
 

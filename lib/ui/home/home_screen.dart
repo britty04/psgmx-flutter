@@ -21,7 +21,10 @@ import 'widgets/leetcode_leaderboard.dart';
 import 'widgets/attendance_action_card.dart';
 import 'widgets/create_announcement_dialog.dart';
 import 'widgets/birthday_greeting_card.dart';
+import 'package:intl/intl.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import '../attendance/daily_attendance_sheet.dart';
+import '../../ui/update/update_gate.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -30,7 +33,7 @@ class HomeScreen extends StatefulWidget {
   State<HomeScreen> createState() => _HomeScreenState();
 }
 
-class _HomeScreenState extends State<HomeScreen> {
+class _HomeScreenState extends State<HomeScreen> with UpdateCheckMixin {
   bool _isClassDay = true;
   bool _isLoadingClassStatus = true;
 
@@ -88,20 +91,33 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Future<void> _refreshAll() async {
     if (!mounted) return;
-    // 1. Refresh Leaderboard
-    // 2. Fetch Announcements
-    context.read<AnnouncementProvider>().fetchAnnouncements();
-
-    // 3. Refresh My LeetCode Stats
-    final user = context.read<UserProvider>().currentUser;
-    if (user?.leetcodeUsername != null) {
-      await context
-          .read<LeetCodeProvider>()
-          .fetchStats(user!.leetcodeUsername!);
+    
+    // 1. Fetch Announcements
+    try {
+      context.read<AnnouncementProvider>().fetchAnnouncements();
+    } catch (e) {
+      debugPrint('[HomeScreen] Announcement error: $e');
     }
 
-    // 4. Check Class Day Status
+    // 2. Refresh My LeetCode Stats
+    try {
+      final user = context.read<UserProvider>().currentUser;
+      if (user?.leetcodeUsername != null) {
+        await context
+            .read<LeetCodeProvider>()
+            .fetchStats(user!.leetcodeUsername!);
+      }
+    } catch (e) {
+      debugPrint('[HomeScreen] LeetCode sync error: $e');
+    }
+
+    // 3. Check Class Day Status
     await _checkClassDay();
+    
+    // 4. Check Attendance Popup (only if class day is confirmed)
+    if (_isClassDay) {
+      _checkAttendancePopup();
+    }
   }
 
   Future<void> _checkClassDay() async {
@@ -120,28 +136,63 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   void _checkAttendancePopup() async {
+    if (!mounted) return;
     final userProvider = context.read<UserProvider>();
+    
+    // Only Team Leaders get the persistent popup/modal
     if (!userProvider.isTeamLeader) return;
 
-    // Only check on class days!
-    if (!_isClassDay) return;
+    final teamId = userProvider.currentUser?.teamId;
+    if (teamId == null) return;
 
-    final now = DateTime.now();
     // After 5 PM
-    if (now.hour >= 17) {
-      // Ideally check if already submitted today
-      if (!mounted) return;
-      await Future.delayed(
-          const Duration(seconds: 1)); // Small delay for enter animation
-      if (!mounted) return;
+    final now = DateTime.now();
+    if (now.hour < 17) return;
 
-      showModalBottomSheet(
-        context: context,
-        isScrollControlled: true,
-        backgroundColor: Colors.transparent,
-        builder: (ctx) => const DailyAttendanceSheet(),
-      );
+    // Production-grade check: Is all attendance marked for this team?
+    try {
+      final supabase = Supabase.instance.client;
+      final todayStr = DateFormat('yyyy-MM-dd').format(now);
+
+      // 1. Get total number of students in the team from whitelist/users
+      final membersResponse = await supabase
+          .from('users')
+          .select('id')
+          .eq('team_id', teamId)
+          .eq('roles->>isStudent', 'true');
+      
+      final totalMembers = (membersResponse as List).length;
+
+      // 2. Get number of attendance records marked today for this team
+      final attendanceResponse = await supabase
+          .from('attendance_records')
+          .select('id')
+          .eq('team_id', teamId)
+          .eq('date', todayStr);
+      
+      final markedCount = (attendanceResponse as List).length;
+
+      // If everyone is marked, or no members to mark, don't show the popup
+      if (totalMembers == 0 || markedCount >= totalMembers) {
+        debugPrint('[HomeScreen] Attendance marking not needed or already done ($markedCount/$totalMembers). Skipping popup.');
+        return;
+      }
+    } catch (e) {
+      debugPrint('[HomeScreen] Attendance check failed: $e');
+      // On error, we proceed to show popup as fallback if it's late enough
     }
+
+    if (!mounted) return;
+    await Future.delayed(const Duration(seconds: 1)); 
+    if (!mounted) return;
+
+    // Show popup
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => const DailyAttendanceSheet(),
+    );
   }
 
   void _showAttendanceSheet(BuildContext context) {
@@ -403,8 +454,8 @@ class _HomeScreenState extends State<HomeScreen> {
     // Determine Dashboard Type
     final isStudentView =
         !userProvider.isCoordinator && !userProvider.isPlacementRep;
-    // Show TL Actions if Lead AND Class Day
-    final showTLActions = userProvider.isTeamLeader && _isClassDay;
+    // Show Daily Attendance action for Team Leaders (on class days)
+    final showAttendanceAction = userProvider.isTeamLeader && _isClassDay;
 
     return Scaffold(
       floatingActionButton: FloatingActionButton(
@@ -498,8 +549,8 @@ class _HomeScreenState extends State<HomeScreen> {
                   _QuoteCard(service: quoteService),
                   const SizedBox(height: AppSpacing.xxl),
 
-                  // 4. TL Actions
-                  if (showTLActions) ...[
+                  // 4. Attendance Actions
+                  if (showAttendanceAction) ...[
                     AttendanceActionCard(
                         onTap: () => _showAttendanceSheet(context)),
                     const SizedBox(height: AppSpacing.xxl),

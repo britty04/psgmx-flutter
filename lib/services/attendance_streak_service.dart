@@ -1,13 +1,11 @@
 import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../models/attendance_streak.dart';
-import 'attendance_service.dart';
 
 /// Service for calculating real attendance streaks and providing
 /// attendance calculation explanations (A3 & A4)
 class AttendanceStreakService {
   final SupabaseClient _supabase = Supabase.instance.client;
-  final AttendanceService _attendanceService = AttendanceService();
 
   // ========================================
   // A3: REAL ATTENDANCE STREAK CALCULATION
@@ -87,7 +85,7 @@ class AttendanceStreakService {
 
         // Skip non-class days
         final isClassDay = workingDayMap[dateStr] ??
-            _attendanceService._isDefaultClassDay(DateTime.parse(dateStr));
+            _isDefaultClassDay(DateTime.parse(dateStr));
         if (!isClassDay) continue;
 
         if (status == 'PRESENT') {
@@ -150,7 +148,7 @@ class AttendanceStreakService {
           .from('scheduled_attendance_dates')
           .select('date, is_working_day');
 
-      // Build working day map
+      // Build working day map from scheduled dates
       final workingDayMap = <String, bool>{};
       for (var day in daysResponse as List) {
         workingDayMap[day['date']] = day['is_working_day'] ?? true;
@@ -164,37 +162,50 @@ class AttendanceStreakService {
       DateTime? startDate;
       DateTime? endDate;
 
-      // Get unique dates from scheduled_attendance_dates
-      for (var entry in workingDayMap.entries) {
-        final date = DateTime.parse(entry.key);
-        if (entry.value) {
+      // Collect all unique dates from scheduled dates AND records
+      final Set<String> allRelevantDates = {};
+      for (var record in recordsResponse as List) {
+        allRelevantDates.add(record['date'] as String);
+      }
+      for (var day in daysResponse as List) {
+        allRelevantDates.add(day['date'] as String);
+      }
+
+      // Map unique dates to their status
+      for (var dateStr in allRelevantDates) {
+        final date = DateTime.parse(dateStr);
+        
+        // Determine if it was a class day
+        // 1. Check if explicitly scheduled (takes priority)
+        // 2. Otherwise use default class days
+        final isClassDay = workingDayMap[dateStr] ?? _isDefaultClassDay(date);
+
+        if (isClassDay) {
           totalClassDays++;
+          
+          // Check if user has a record for this class day
+          final record = (recordsResponse as List).firstWhere(
+            (r) => r['date'] == dateStr,
+            orElse: () => null,
+          );
+
+          if (record != null) {
+            final status = record['status'] as String;
+            if (status == 'PRESENT') {
+              presentCount++;
+            } else if (status == 'ABSENT') {
+              absentCount++;
+            }
+          }
         } else {
           totalNonClassDays++;
         }
+
         if (startDate == null || date.isBefore(startDate)) {
           startDate = date;
         }
         if (endDate == null || date.isAfter(endDate)) {
           endDate = date;
-        }
-      }
-
-      // Count present/absent from records
-      for (var record in recordsResponse as List) {
-        final dateStr = record['date'] as String;
-        final status = record['status'] as String;
-
-        // Only count class days
-        final isClassDay = workingDayMap[dateStr] ??
-            _attendanceService._isDefaultClassDay(DateTime.parse(dateStr));
-
-        if (!isClassDay) continue;
-
-        if (status == 'PRESENT') {
-          presentCount++;
-        } else if (status == 'ABSENT') {
-          absentCount++;
         }
       }
 
@@ -267,10 +278,7 @@ class AttendanceStreakService {
       debugPrint('[AttendanceStreakService] Error running defaulter check: $e');
     }
   }
-}
-
-// Extension to expose private method for local calculation
-extension on AttendanceService {
+  /// Helper: Check if a day is a default class day
   bool _isDefaultClassDay(DateTime date) {
     final weekday = date.weekday;
 

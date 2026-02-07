@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 import '../models/leetcode_stats.dart';
 import '../services/supabase_service.dart';
 import '../services/notification_service.dart';
+import '../models/notification.dart';
 
 class LeetCodeProvider extends ChangeNotifier {
   final SupabaseService _supabaseService;
@@ -142,24 +143,56 @@ class LeetCodeProvider extends ChangeNotifier {
 
   Future<List<LeetCodeStats>> fetchAllUsers() async {
     try {
-      // 1. Fetch ALL whitelisted students (Source of Truth for Names)
+      // 1. Fetch ALL whitelisted students AND active users (Source of Truth for Names)
+      // We merge both, prioritizing the 'users' table for updated leetcode usernames
       final whitelistResponse = await _supabaseService.client
           .from('whitelist')
-          .select('leetcode_username, name');
+          .select('leetcode_username, name, reg_no');
+      
+      final usersResponse = await _supabaseService.client
+          .from('users')
+          .select('leetcode_username, name, reg_no')
+          .not('leetcode_username', 'is', null);
           
       final nameMap = <String, String>{};
-      final whitelistUsernames = <String>{};
+      final activeUsernames = <String>{};
       
+      // Temporary registry by Reg No to handle overrides correctly
+      final registry = <String, Map<String, String>>{};
+
+      // Load whitelist first (baseline)
       for (var entry in whitelistResponse as List) {
+        final regNo = entry['reg_no'] as String?;
         final username = entry['leetcode_username'] as String?;
         final name = entry['name'] as String?;
-        if (username != null && username.isNotEmpty) {
-           final cleanUser = _cleanUsername(username);
-           whitelistUsernames.add(cleanUser);
-           if (name != null) {
-             nameMap[cleanUser] = name;
-           }
+        
+        if (regNo != null && username != null && username.isNotEmpty) {
+          registry[regNo] = {
+            'username': _cleanUsername(username),
+            'name': name ?? 'Unknown Student',
+          };
         }
+      }
+
+      // Overlay with users table (production-grade override for profile updates)
+      for (var entry in usersResponse as List) {
+        final regNo = entry['reg_no'] as String?;
+        final username = entry['leetcode_username'] as String?;
+        final name = entry['name'] as String?;
+        
+        if (regNo != null && username != null && username.isNotEmpty) {
+          registry[regNo] = {
+            'username': _cleanUsername(username),
+            'name': name ?? registry[regNo]?['name'] ?? 'Unknown Student',
+          };
+        }
+      }
+
+      // Finalize the active lists
+      for (var item in registry.values) {
+        final u = item['username']!;
+        activeUsernames.add(u);
+        nameMap[u] = item['name']!;
       }
 
       // 2. Fetch ALL stats from database
@@ -171,26 +204,23 @@ class LeetCodeProvider extends ChangeNotifier {
       
       final dbStatsList = (statsResponse as List).map((e) => LeetCodeStats.fromMap(e)).toList();
       
-      // 3. Merge: Add names to stats AND include users with no stats (yet)
+      // 3. Merge: Only include users from the active registry
       final mergedUsers = <LeetCodeStats>[];
       final seenUsernames = <String>{};
       
-      // First, add existing stats and attach names
+      // First, add existing stats for active users (prioritizing updated usernames)
       for (var stat in dbStatsList) {
         final cleanUser = _cleanUsername(stat.username);
-        seenUsernames.add(cleanUser);
         
-        // Attach name if available
-        if (nameMap.containsKey(cleanUser)) {
+        // ONLY include if in active registry (Source of Truth)
+        if (activeUsernames.contains(cleanUser)) {
+           seenUsernames.add(cleanUser);
            mergedUsers.add(stat.copyWith(name: nameMap[cleanUser]));
-        } else {
-           mergedUsers.add(stat);
         }
       }
       
-      // Second, add students from whitelist who have no stats entry yet (create empty placeholder)
-      // This ensures they appear in the list (at bottom) until fetched
-      for (var username in whitelistUsernames) {
+      // Second, add students from active registry who have no stats entry yet (create empty placeholder)
+      for (var username in activeUsernames) {
         if (!seenUsernames.contains(username)) {
            mergedUsers.add(
              LeetCodeStats.empty(username).copyWith(name: nameMap[username])
@@ -241,29 +271,54 @@ class LeetCodeProvider extends ChangeNotifier {
   /// Refresh all users from LeetCode API (Placement Rep Only)
   /// This should only be called by authorized users
   Future<void> refreshAllUsersFromAPI() async {
+    if (_isLoading) {
+      debugPrint('[LeetCode] Sync already in progress, skipping request.');
+      return;
+    }
+
     _isLoading = true;
     _loadingMessage = 'Preparing refresh...';
     notifyListeners();
     
     try {
-      // 1. Get all leetcode usernames from WHITELIST (Source of Truth)
-      // This checks EVERY student, not just those who signed up
-      _loadingMessage = 'Loading user list...';
+      // 1. Get all leetcode usernames from both tables (Source of Truth)
+      // We prioritize the 'users' table because students can update their profiles there.
+      _loadingMessage = 'Loading student list...';
       notifyListeners();
-      final usersResponse = await _supabaseService.client
+
+      final whitelistResponse = await _supabaseService.client
           .from('whitelist')
-          .select('leetcode_username')
+          .select('leetcode_username, reg_no')
           .not('leetcode_username', 'is', null);
       
-      final usernames = <String>{};
-      for (var user in usersResponse as List) {
-        final username = user['leetcode_username'] as String?;
-        if (username != null && username.isNotEmpty && username != 'NULL') {
-          usernames.add(_cleanUsername(username));
+      final usersResponse = await _supabaseService.client
+          .from('users')
+          .select('leetcode_username, reg_no')
+          .not('leetcode_username', 'is', null);
+
+      final usernameByRegNo = <String, String>{};
+      
+      // Load whitelist baseline
+      for (var entry in whitelistResponse as List) {
+        final regNo = entry['reg_no'] as String?;
+        final username = entry['leetcode_username'] as String?;
+        if (regNo != null && username != null && username.isNotEmpty && username != 'NULL') {
+          usernameByRegNo[regNo] = _cleanUsername(username);
+        }
+      }
+
+      // Overlay with actual user table (prioritizes manual profile updates)
+      for (var entry in usersResponse as List) {
+        final regNo = entry['reg_no'] as String?;
+        final username = entry['leetcode_username'] as String?;
+        if (regNo != null && username != null && username.isNotEmpty && username != 'NULL') {
+          usernameByRegNo[regNo] = _cleanUsername(username);
         }
       }
       
-      debugPrint('[LeetCode] Found ${usernames.length} students to refresh');
+      final usernames = usernameByRegNo.values.toSet().toList();
+      
+      debugPrint('[LeetCode] Found ${usernames.length} students to refresh across tables');
 
       // 2. Show current database data first (with names attached)
       _loadingMessage = 'Loading cached data...';
@@ -368,6 +423,20 @@ class LeetCodeProvider extends ChangeNotifier {
     
     // Final UI refresh with all new data
     await fetchAllUsers();
+
+    // Production-Grade: Notify background completion
+    try {
+      final notifService = NotificationService();
+      await notifService.showNotification(
+        id: 888, // Unique ID for sync notifications
+        title: 'LeetCode Sync Complete',
+        body: 'Successfully updated $successCount student profiles.',
+        type: NotificationType.leetcode,
+        persistToDatabase: false,
+      );
+    } catch (e) {
+      debugPrint('[LeetCode] Failed to show background notification: $e');
+    }
   }
   
   /// Save last refresh timestamp to database

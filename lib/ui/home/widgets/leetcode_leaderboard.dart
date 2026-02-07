@@ -99,11 +99,13 @@ class _LeetCodeLeaderboardState extends State<LeetCodeLeaderboard>
         // Show progress modal
         await showDialog<void>(
           context: context,
-          barrierDismissible: false,
+          barrierDismissible: true,
           builder: (dialogContext) => _RefreshProgressModal(
             leetCodeProvider: leetCodeProvider,
             onComplete: () {
-              Navigator.of(dialogContext).pop();
+              if (Navigator.of(dialogContext).canPop()) {
+                Navigator.of(dialogContext).pop();
+              }
             },
           ),
         );
@@ -742,11 +744,11 @@ class _LeetCodeLeaderboardState extends State<LeetCodeLeaderboard>
       builder: (context, constraints) {
         final width = constraints.maxWidth;
         int crossAxisCount = 2;
-        if (width > 900) {
+        if (width > 1200) {
           crossAxisCount = 5;
-        } else if (width > 600) {
+        } else if (width > 900) {
           crossAxisCount = 4;
-        } else if (width > 400) {
+        } else if (width > 600) {
           crossAxisCount = 3;
         }
 
@@ -755,9 +757,9 @@ class _LeetCodeLeaderboardState extends State<LeetCodeLeaderboard>
           shrinkWrap: true,
           gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
             crossAxisCount: crossAxisCount,
-            childAspectRatio: 0.75,
-            crossAxisSpacing: 12,
-            mainAxisSpacing: 12,
+            childAspectRatio: 0.82,
+            crossAxisSpacing: 14,
+            mainAxisSpacing: 14,
           ),
           itemCount: users.length,
           itemBuilder: (ctx, idx) {
@@ -921,8 +923,8 @@ class _LeetCodeLeaderboardState extends State<LeetCodeLeaderboard>
 
             // Avatar
             Container(
-              width: 48,
-              height: 48,
+              width: 56,
+              height: 56,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
                 gradient: LinearGradient(
@@ -955,6 +957,8 @@ class _LeetCodeLeaderboardState extends State<LeetCodeLeaderboard>
               ),
             ),
 
+            const SizedBox(height: 10),
+
             // Name & Username
             Column(
               children: [
@@ -965,7 +969,7 @@ class _LeetCodeLeaderboardState extends State<LeetCodeLeaderboard>
                   textAlign: TextAlign.center,
                   style: GoogleFonts.poppins(
                     fontWeight: FontWeight.bold,
-                    fontSize: 13,
+                    fontSize: 13.5,
                     color: textPrimary,
                   ),
                 ),
@@ -976,16 +980,18 @@ class _LeetCodeLeaderboardState extends State<LeetCodeLeaderboard>
                     overflow: TextOverflow.ellipsis,
                     textAlign: TextAlign.center,
                     style: GoogleFonts.inter(
-                      fontSize: 11,
+                      fontSize: 10.5,
                       color: textSecondary,
                     ),
                   ),
               ],
             ),
 
+            const SizedBox(height: 10),
+
             // Score
             Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
               decoration: BoxDecoration(
                 color: accentColor.withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(14),
@@ -1000,23 +1006,25 @@ class _LeetCodeLeaderboardState extends State<LeetCodeLeaderboard>
                     "${_isWeekly ? user.weeklyScore : user.totalSolved}",
                     style: GoogleFonts.poppins(
                       fontWeight: FontWeight.bold,
-                      fontSize: 20,
+                      fontSize: 22,
                       color: accentColor,
                       height: 1.0,
                     ),
                   ),
-                  const SizedBox(height: 1),
+                  const SizedBox(height: 2),
                   Text(
                     _isWeekly ? "Weekly" : "Total",
                     style: GoogleFonts.inter(
                       fontSize: 10,
-                      fontWeight: FontWeight.w500,
+                      fontWeight: FontWeight.w600,
                       color: textSecondary,
                     ),
                   ),
                 ],
               ),
             ),
+
+            const SizedBox(height: 10),
 
             // Difficulty Stats
             Row(
@@ -1385,15 +1393,17 @@ class _RefreshProgressModalState extends State<_RefreshProgressModal>
     final textSecondary = isDark ? Colors.grey.shade400 : Colors.grey.shade600;
 
     return PopScope(
-      canPop: _isComplete,
+      canPop: true,
       child: Dialog(
         backgroundColor: cardBg,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
-        child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
+        child: Stack(
+          children: [
+            Padding(
+              padding: const EdgeInsets.all(24),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
               // Animated Icon
               AnimatedBuilder(
                 animation: _pulseController,
@@ -1478,25 +1488,25 @@ class _RefreshProgressModalState extends State<_RefreshProgressModal>
                 const SizedBox(height: 16),
               ],
               
-              // Warning message
+              // Info message
               if (!_isComplete)
                 Container(
                   padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
-                    color: Colors.amber.withValues(alpha: 0.1),
+                    color: Colors.blue.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: Colors.amber.withValues(alpha: 0.3)),
+                    border: Border.all(color: Colors.blue.withValues(alpha: 0.3)),
                   ),
                   child: Row(
                     children: [
-                      const Icon(Icons.info_outline, color: Colors.amber, size: 20),
+                      const Icon(Icons.cloud_sync_rounded, color: Colors.blue, size: 20),
                       const SizedBox(width: 8),
                       Expanded(
                         child: Text(
-                          'Please wait until the process completes. Do not close this dialog.',
+                          'Syncing in background. You can safely close this dialog; we will notify you when finished.',
                           style: GoogleFonts.inter(
                             fontSize: 12,
-                            color: Colors.amber.shade700,
+                            color: isDark ? Colors.blue.shade300 : Colors.blue.shade700,
                           ),
                         ),
                       ),
@@ -1534,7 +1544,18 @@ class _RefreshProgressModalState extends State<_RefreshProgressModal>
             ],
           ),
         ),
-      ),
-    );
+        // Close Button
+        Positioned(
+          top: 8,
+          right: 8,
+          child: IconButton(
+            onPressed: () => Navigator.pop(context),
+            icon: Icon(Icons.close_rounded, color: textSecondary),
+          ),
+        ),
+      ],
+    ),
+  ),
+);
   }
 }

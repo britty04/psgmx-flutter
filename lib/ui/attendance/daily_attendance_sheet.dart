@@ -5,6 +5,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 import '../../providers/attendance_provider.dart';
 import '../../providers/user_provider.dart';
+import '../../models/app_user.dart';
 import '../../services/attendance_schedule_service.dart';
 import '../../core/theme/app_dimens.dart';
 
@@ -49,10 +50,18 @@ class _DailyAttendanceSheetState extends State<DailyAttendanceSheet> {
   }
 
   // Helper to initialize status map when data arrives
-  void _ensureStatusMapInitialized(List<dynamic> members) {
+  void _ensureStatusMapInitialized(List<AppUser> members) {
     if (_statusMap.isEmpty && members.isNotEmpty) {
+      final provider = context.read<AttendanceProvider>();
+      final isRep = context.read<UserProvider>().isPlacementRep;
+
       for (var m in members) {
-        _statusMap[m.uid] = 'PRESENT';
+        // Production-grade: If rep and data exists in provider's preloaded map, use it
+        if (isRep && provider.statusMap.containsKey(m.uid)) {
+          _statusMap[m.uid] = provider.statusMap[m.uid]!;
+        } else {
+          _statusMap[m.uid] = 'PRESENT';
+        }
       }
     }
   }
@@ -209,7 +218,7 @@ class _DailyAttendanceSheetState extends State<DailyAttendanceSheet> {
                   );
                 }
 
-                if (provider.hasSubmittedToday) return _buildSubmittedView();
+                if (provider.hasSubmittedToday && !context.read<UserProvider>().isPlacementRep) return _buildSubmittedView();
                 
                 // Initialize checks
                 _ensureStatusMapInitialized(provider.teamMembers);
@@ -251,9 +260,31 @@ class _DailyAttendanceSheetState extends State<DailyAttendanceSheet> {
                           member.name, 
                           style: GoogleFonts.inter(fontWeight: FontWeight.w600)
                         ),
-                        subtitle: Text(
-                          member.regNo,
-                          style: TextStyle(color: theme.colorScheme.onSurfaceVariant)
+                        subtitle: Row(
+                          children: [
+                            Text(
+                              member.regNo,
+                              style: TextStyle(color: theme.colorScheme.onSurfaceVariant)
+                            ),
+                            if (member.uid.contains('@')) ...[
+                              const SizedBox(width: 8),
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                decoration: BoxDecoration(
+                                  color: Colors.amber.withValues(alpha: 0.15),
+                                  borderRadius: BorderRadius.circular(4),
+                                ),
+                                child: const Text(
+                                  "UNREGISTERED",
+                                  style: TextStyle(
+                                    color: Colors.amber, 
+                                    fontSize: 9, 
+                                    fontWeight: FontWeight.bold
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ],
                         ),
                         trailing: Transform.scale(
                           scale: 1.0,

@@ -1392,7 +1392,7 @@ class _OverallAttendanceTabState extends State<_OverallAttendanceTab> {
     if (!mounted || result == null) return;
 
     await _loadData();
-    if (!context.mounted) return;
+    if (!mounted) return;
 
     final markedLabel =
         result.savedCount == 1 ? '1 record' : '${result.savedCount} records';
@@ -1444,7 +1444,7 @@ class _OverallAttendanceTabState extends State<_OverallAttendanceTab> {
       );
       if (!mounted) return;
       await _loadData();
-      if (!context.mounted) return;
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
             content: Text('Individual attendance changes reverted.')),
