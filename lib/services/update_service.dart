@@ -210,15 +210,26 @@ class UpdateService extends ChangeNotifier {
 
     try {
       final uri = Uri.parse(url);
-      if (await canLaunchUrl(uri)) {
-        await launchUrl(uri, mode: LaunchMode.externalApplication);
-        return true;
+      
+      // Try external application first (preferred for APK downloads)
+      bool launched = await launchUrl(uri, mode: LaunchMode.externalApplication);
+      
+      if (!launched) {
+        // Fallback to platform default
+        launched = await launchUrl(uri);
       }
+      
+      return launched;
     } catch (e) {
       debugPrint('❌ [UpdateService] Error opening URL: $e');
+      
+      // Final attempt using launchUrlString if uri fails
+      try {
+        return await launchUrl(Uri.parse(url));
+      } catch (_) {
+        return false;
+      }
     }
-
-    return false;
   }
 
   // ========================================

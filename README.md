@@ -4,12 +4,13 @@
 
   ![PSGMX Logo](assets/images/psgmx_logo.png)
 
-  > A comprehensive placement preparation platform for PSG Technology - MCA Batch (2025-2027)
+  > A professional placement preparation and batch management platform for PSG Technology - MCA Batch (2025-2027)
 
-  [![Version](https://img.shields.io/badge/version-2.2.4-blue.svg)](pubspec.yaml)
+  [![Version](https://img.shields.io/badge/version-2.2.5-blue.svg)](pubspec.yaml)
   [![Downloads](https://img.shields.io/github/downloads/brittytino/psgmx-flutter/total.svg)](https://github.com/brittytino/psgmx-flutter/releases)
   [![Flutter](https://img.shields.io/badge/Flutter-3.27+-02569B?logo=flutter&logoColor=white)](https://flutter.dev)
   [![Supabase](https://img.shields.io/badge/Supabase-Production-3ECF8E?logo=supabase&logoColor=white)](https://supabase.com)
+  [![Firebase](https://img.shields.io/badge/Hosting-Firebase-FFCA28?logo=firebase&logoColor=white)](https://firebase.google.com)
   [![License](https://img.shields.io/badge/License-MIT-green)](LICENSE)
 
 </div>
@@ -132,46 +133,7 @@ Every push to `main` branch automatically deploys via GitHub Actions!
 
 **See complete setup guide**: [FIREBASE_DEPLOYMENT.md](FIREBASE_DEPLOYMENT.md)
 
-**Your live URL**: `https://your-project-id.web.app`
-
----
-
-## 🌐 Deploy to Vercel
-
-### Quick Deploy
-```bash
-# Install Vercel CLI
-npm i -g vercel
-
-# Login
-vercel login
-
-# Deploy
-vercel --prod
-```
-
-### Environment Variables in Vercel
-
-Configure these in Vercel Dashboard → Project → Settings → Environment Variables:
-
-```
-SUPABASE_URL=your_supabase_project_url
-SUPABASE_ANON_KEY=your_supabase_anon_key
-```
-
-**Note**: For Flutter Web, environment variables are compiled into the build. You need to pass them during build:
-
-```bash
-flutter build web --release \
-  --dart-define=SUPABASE_URL=your_url \
-  --dart-define=SUPABASE_ANON_KEY=your_key
-```
-
-### Vercel Configuration
-The `vercel.json` file is already configured with:
-- Optimized caching strategy
-- Security headers (CSP, X-Frame-Options, etc.)
-- SPA routing for Flutter Web
+**Your live URL**: `https://psgmxians.web.app`
 
 ---
 
@@ -206,27 +168,27 @@ database/
 
 ## 🛠️ Tech Stack & Architecture
 
-- **Frontend**: Flutter 3.27+ (Web, Android, iOS)
+- **Build for Web**: `flutter build web --release --web-renderer canvaskit`
+- **Frontend**: Flutter 3.27+ (Web, Android)
 - **Backend**: Supabase (PostgreSQL, Auth, Realtime)
-- **State Management**: Provider
-- **Routing**: GoRouter
-- **Architecture**: Feature-first with service layer
-- **Deployment**: Vercel (Web), GitHub Releases (APK)
+- **Deployment**: Firebase Hosting (Web), GitHub Releases (Android APK)
+- **State Management**: Provider with Service-Oriented Logic
+- **Architecture**: Modular feature-first structure
 
 ---
 
 ## 🤝 Contributing
 
-We welcome contributions! Please see [CONTRIBUTING.md](CONTRIBUTING.md) for details.
+We welcome contributions from the PSG MCA community! To maintain the high standard of this platform, please follow these guidelines:
 
 ### Development Workflow
-1. Fork the repository
-2. Create a feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit your changes (`git commit -m 'Add amazing feature'`)
-4. Push to the branch (`git push origin feature/amazing-feature`)
-5. Open a Pull Request
+1. **Repository Alignment**: Ensure you are familiar with the `Provider` pattern and the service-oriented architecture used throughout the app.
+2. **Quality Control**: Before submitting any PR, ensure that `flutter analyze` returns **no issues**. Code consistency and linting are strictly enforced.
+3. **Drafting Changes**: Create a descriptive feature branch (`git checkout -b feature/your-feature-name`).
+4. **Testing**: Verify your changes across both Web and Android if they affect cross-platform components.
+5. **Documentation**: Update the relevant documentation if your changes introduce new architecture or database schemas.
 
-See [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md) for community guidelines.
+See [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md) for community guidelines and [CONTRIBUTING.md](CONTRIBUTING.md) for deep-dive technical requirements.
 
 ---
 
@@ -290,7 +252,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 - [x] LeetCode integration and leaderboard
 - [x] Attendance tracking system
 - [x] Real-time announcements
-- [x] Web deployment on Vercel
+- [x] Web deployment on Firebase Hosting
 - [ ] Push notifications for mobile
 - [ ] Advanced analytics dashboard
 - [ ] Interview preparation resources
@@ -298,4 +260,4 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ---
 
-**Made with ❤️ for PSG MCA by [Tino Britty J](https://tinobritty.me)**
+**Built by PSG MCA Placement Coordinators with entire team support. Thanks to all students.**
