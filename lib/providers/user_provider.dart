@@ -184,13 +184,22 @@ class UserProvider with ChangeNotifier {
   Future<void> updateLeetCodeUsername(String username) async {
     if (_currentUser == null) return;
     try {
-      await Supabase.instance.client
-          .from('users')
-          .update({'leetcode_username': username}).eq('id', _currentUser!.uid);
+      // Use RPC to ensure atomic update across users, whitelist, and stats tables
+      await Supabase.instance.client.rpc(
+        'update_leetcode_username_unified',
+        params: {
+          'p_user_id': _currentUser!.uid,
+          'p_new_username': username,
+        },
+      );
 
       _currentUser = _currentUser!.copyWith(leetcodeUsername: username);
       notifyListeners();
+      
+      // Force refresh stats for the new username
+      // We can notify LeetCodeProvider if needed, but the periodic fetcher will catch it
     } catch (e) {
+      debugPrint('[UserProvider] Error updating LeetCode username: $e');
       rethrow;
     }
   }

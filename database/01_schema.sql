@@ -1,7 +1,7 @@
 -- ========================================
 -- PSG MX PLACEMENT APP - DATABASE SCHEMA
 -- ========================================
--- File 1 of 5: Schema Creation
+-- File 1 of 6: Schema Creation
 -- 
 -- This creates all tables, indexes, and extensions.
 -- Run this FIRST in Supabase SQL Editor.
@@ -27,6 +27,7 @@ CREATE TABLE IF NOT EXISTS users (
     dob DATE,
     birthday_notifications_enabled BOOLEAN DEFAULT TRUE,
     leetcode_notifications_enabled BOOLEAN DEFAULT TRUE,
+    task_reminders_enabled BOOLEAN DEFAULT TRUE,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
@@ -161,7 +162,7 @@ CREATE TABLE IF NOT EXISTS notifications (
     message TEXT NOT NULL,
     notification_type TEXT NOT NULL CHECK (notification_type IN ('motivation', 'reminder', 'alert', 'announcement')),
     tone TEXT CHECK (tone IN ('serious', 'friendly', 'humorous')),
-    target_audience TEXT NOT NULL CHECK (target_audience IN ('all', 'students', 'team_leaders', 'coordinators', 'placement_reps')),
+    target_audience TEXT NOT NULL CHECK (target_audience IN ('all', 'students', 'team_leaders', 'coordinators', 'placement_reps', 'G1', 'G2')),
     generated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     valid_until TIMESTAMPTZ,
     created_by UUID REFERENCES users(id),
@@ -181,7 +182,7 @@ CREATE TABLE IF NOT EXISTS notification_reads (
 );
 
 -- ========================================
--- TABLE 10: attendance_days (legacy - kept for compatibility)
+-- TABLE 10: attendance_days (legacy)
 -- ========================================
 CREATE TABLE IF NOT EXISTS attendance_days (
     date DATE PRIMARY KEY,
@@ -190,6 +191,44 @@ CREATE TABLE IF NOT EXISTS attendance_days (
     reason TEXT,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+-- ========================================
+-- TABLE 11: task_completions
+-- ========================================
+-- Tracks daily task completion and verification
+CREATE TABLE IF NOT EXISTS task_completions (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    task_id UUID NOT NULL REFERENCES daily_tasks(id) ON DELETE CASCADE,
+    proof_link TEXT,
+    status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'completed', 'verified', 'rejected')),
+    verified_by UUID REFERENCES users(id),
+    verified_at TIMESTAMPTZ,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    UNIQUE(user_id, task_id)
+);
+CREATE INDEX IF NOT EXISTS idx_completions_user_id ON task_completions(user_id);
+CREATE INDEX IF NOT EXISTS idx_completions_task_id ON task_completions(task_id);
+
+-- ========================================
+-- TABLE 12: app_config
+-- ========================================
+CREATE TABLE IF NOT EXISTS app_config (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    min_required_version TEXT NOT NULL DEFAULT '1.0.0',
+    latest_version TEXT NOT NULL DEFAULT '1.0.0',
+    force_update BOOLEAN NOT NULL DEFAULT false,
+    update_message TEXT DEFAULT 'A new version of PSGMX is available.',
+    github_release_url TEXT DEFAULT 'https://github.com/psgmx/psgmx-flutter/releases/latest',
+    android_download_url TEXT,
+    ios_download_url TEXT,
+    emergency_block BOOLEAN NOT NULL DEFAULT false,
+    emergency_message TEXT DEFAULT 'App temporarily unavailable.',
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_by TEXT
 );
 
 -- ========================================
@@ -202,17 +241,19 @@ BEGIN
     RAISE NOTICE '✅ STEP 1 COMPLETE: SCHEMA CREATED';
     RAISE NOTICE '========================================';
     RAISE NOTICE 'Tables Created:';
-    RAISE NOTICE '  1. users           - All user accounts';
-    RAISE NOTICE '  2. whitelist       - Master student list';
-    RAISE NOTICE '  3. leetcode_stats  - LeetCode scores';
-    RAISE NOTICE '  4. daily_tasks     - Daily assignments';
+    RAISE NOTICE '  1. users';
+    RAISE NOTICE '  2. whitelist';
+    RAISE NOTICE '  3. leetcode_stats';
+    RAISE NOTICE '  4. daily_tasks';
     RAISE NOTICE '  5. scheduled_attendance_dates';
     RAISE NOTICE '  6. attendance_records';
     RAISE NOTICE '  7. audit_logs';
     RAISE NOTICE '  8. notifications';
     RAISE NOTICE '  9. notification_reads';
     RAISE NOTICE ' 10. attendance_days';
+    RAISE NOTICE ' 11. task_completions';
+    RAISE NOTICE ' 12. app_config';
     RAISE NOTICE '';
-    RAISE NOTICE 'NEXT: Run 02_data.sql';
+    RAISE NOTICE 'NEXT: Run 02_policies.sql';
     RAISE NOTICE '========================================';
 END $$;

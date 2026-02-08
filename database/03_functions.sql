@@ -1,11 +1,11 @@
 -- ========================================
 -- PSG MX PLACEMENT APP - FUNCTIONS & VIEWS
 -- ========================================
--- File 3 of 5: Helper Functions & Analytics Views
+-- File 3 of 6: Helper Functions & Analytics Views
 -- 
 -- Creates functions for role checking, date validation,
 -- and views for attendance summaries.
--- Run this AFTER 02_data.sql
+-- Run this AFTER 02_policies.sql
 -- ========================================
 
 -- ========================================
@@ -94,163 +94,92 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql STABLE;
 
--- Get team attendance for a specific date
-CREATE OR REPLACE FUNCTION get_team_attendance_for_date(
-    check_date DATE,
-    check_team_id TEXT
+-- ========================================
+-- FIX: LeetCode Username Synchronization
+-- ========================================
+-- The Unified Update Function
+-- Call this from the method UserProvider.updateLeetCodeUsername
+CREATE OR REPLACE FUNCTION update_leetcode_username_unified(
+    p_user_id UUID,
+    p_new_username TEXT
 )
-RETURNS TABLE (
-    student_id UUID,
-    student_name TEXT,
-    reg_no TEXT,
-    status TEXT,
-    marked_by UUID
-) AS $$
+RETURNS VOID AS $$
+DECLARE
+    v_old_username TEXT;
+    v_email TEXT;
 BEGIN
-    RETURN QUERY
-    SELECT 
-        u.id as student_id,
-        u.name as student_name,
-        u.reg_no,
-        COALESCE(ar.status, 'NA') as status,
-        ar.marked_by
-    FROM users u
-    LEFT JOIN attendance_records ar ON u.id = ar.user_id AND ar.date = check_date
-    WHERE u.team_id = check_team_id
-    AND u.roles->>'isStudent' = 'true'
-    ORDER BY u.reg_no;
+    -- 1. Get current info (Before update)
+    SELECT leetcode_username, email INTO v_old_username, v_email
+    FROM users
+    WHERE id = p_user_id;
+
+    -- Trim whitespace just in case
+    p_new_username := TRIM(p_new_username);
+
+    -- 2. Update users table (The Source of Truth)
+    UPDATE users
+    SET leetcode_username = p_new_username,
+        updated_at = NOW()
+    WHERE id = p_user_id;
+
+    -- 3. Update whitelist table (Keep registry in sync)
+    IF v_email IS NOT NULL THEN
+        UPDATE whitelist
+        SET leetcode_username = p_new_username
+        WHERE email = v_email;
+    END IF;
+
+    -- 4. Handle LeetCode Stats Table (Preserve History)
+    IF v_old_username IS NOT NULL AND v_old_username != p_new_username THEN
+        
+        -- Check if the old username actually has stats
+        IF EXISTS (SELECT 1 FROM leetcode_stats WHERE username = v_old_username) THEN
+            
+            -- Check if the NEW username already exists (collision)
+            IF EXISTS (SELECT 1 FROM leetcode_stats WHERE username = p_new_username) THEN
+                -- COLLISION: We cannot rename because the new name is already taken.
+                -- Best Action: Delete the old artifact so we don't track stale data.
+                -- The background fetcher will update the existing "new" record.
+                DELETE FROM leetcode_stats WHERE username = v_old_username;
+            ELSE
+                -- NO COLLISION: Rename the old record to the new username.
+                -- This preserves "total_solved", "ranking", etc.
+                UPDATE leetcode_stats
+                SET username = p_new_username,
+                    last_updated = NOW() 
+                WHERE username = v_old_username;
+            END IF;
+        END IF;
+    END IF;
+
+    -- 5. Helper: If no stats record exists at all for the new username (and we didn't just rename one),
+    -- create a stub so the background fetcher picks it up faster.
+    INSERT INTO leetcode_stats (username, total_solved, easy_solved, medium_solved, hard_solved)
+    VALUES (p_new_username, 0, 0, 0, 0)
+    ON CONFLICT (username) DO NOTHING;
+
 END;
-$$ LANGUAGE plpgsql STABLE;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
 
 -- ========================================
--- TRIGGERS
--- ========================================
-
--- Auto-update updated_at timestamp
-CREATE OR REPLACE FUNCTION update_updated_at_column()
-RETURNS TRIGGER AS $$
-BEGIN
-    NEW.updated_at = NOW();
-    RETURN NEW;
-END;
-$$ LANGUAGE plpgsql;
-
--- Apply to tables
-DROP TRIGGER IF EXISTS update_users_updated_at ON users;
-CREATE TRIGGER update_users_updated_at 
-    BEFORE UPDATE ON users
-    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
-
-DROP TRIGGER IF EXISTS update_attendance_records_updated_at ON attendance_records;
-CREATE TRIGGER update_attendance_records_updated_at 
-    BEFORE UPDATE ON attendance_records
-    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
-
-DROP TRIGGER IF EXISTS update_scheduled_dates_updated_at ON scheduled_attendance_dates;
-CREATE TRIGGER update_scheduled_dates_updated_at 
-    BEFORE UPDATE ON scheduled_attendance_dates
-    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
-
-DROP TRIGGER IF EXISTS update_daily_tasks_updated_at ON daily_tasks;
-CREATE TRIGGER update_daily_tasks_updated_at 
-    BEFORE UPDATE ON daily_tasks
-    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
-
--- ========================================
--- VIEWS FOR ANALYTICS
--- ========================================
-
--- Drop existing views
-DROP VIEW IF EXISTS team_attendance_summary CASCADE;
-DROP VIEW IF EXISTS student_attendance_summary CASCADE;
-
--- Student Attendance Summary
--- Shows attendance stats for all 123 students
-CREATE VIEW student_attendance_summary AS
-SELECT 
-    u.id as student_id,
-    u.id as user_id,  -- Alias for compatibility
-    u.email,
-    u.reg_no,
-    u.name,
-    u.team_id,
-    u.batch,
-    COALESCE(present.cnt, 0) as present_count,
-    COALESCE(absent.cnt, 0) as absent_count,
-    COALESCE(present.cnt, 0) + COALESCE(absent.cnt, 0) as total_working_days,
-    CASE 
-        WHEN COALESCE(present.cnt, 0) + COALESCE(absent.cnt, 0) = 0 THEN 0.0
-        ELSE ROUND(
-            (COALESCE(present.cnt, 0)::NUMERIC / 
-             (COALESCE(present.cnt, 0) + COALESCE(absent.cnt, 0))::NUMERIC) * 100,
-            1
-        )
-    END as attendance_percentage
-FROM users u
-LEFT JOIN (
-    SELECT user_id, COUNT(*) as cnt
-    FROM attendance_records
-    WHERE status = 'PRESENT'
-    GROUP BY user_id
-) present ON u.id = present.user_id
-LEFT JOIN (
-    SELECT user_id, COUNT(*) as cnt
-    FROM attendance_records
-    WHERE status = 'ABSENT'
-    GROUP BY user_id
-) absent ON u.id = absent.user_id
-WHERE (u.roles->>'isStudent')::boolean = true OR (u.roles->>'isPlacementRep')::boolean = true
-ORDER BY u.reg_no;
-
--- Team Attendance Summary
--- Shows aggregated stats per team
-CREATE VIEW team_attendance_summary AS
-SELECT 
-    team_id,
-    COUNT(*) as total_members,
-    ROUND(AVG(attendance_percentage), 1) as avg_attendance_percentage,
-    SUM(present_count) as total_present,
-    SUM(absent_count) as total_absent
-FROM student_attendance_summary
-WHERE team_id IS NOT NULL
-GROUP BY team_id
-ORDER BY team_id;
-
--- ========================================
--- VERIFICATION
+-- SUCCESS MESSAGE
 -- ========================================
 DO $$
-DECLARE
-    fn_count INT;
-    view_count INT;
 BEGIN
-    SELECT COUNT(*) INTO fn_count 
-    FROM pg_proc 
-    WHERE proname IN ('has_role', 'is_placement_rep', 'is_coordinator', 'is_team_leader', 'get_user_team', 'is_date_scheduled');
-    
-    SELECT COUNT(*) INTO view_count
-    FROM information_schema.views
-    WHERE table_name IN ('student_attendance_summary', 'team_attendance_summary');
-    
     RAISE NOTICE '';
     RAISE NOTICE '========================================';
-    RAISE NOTICE '✅ STEP 3 COMPLETE: FUNCTIONS & VIEWS';
+    RAISE NOTICE '✅ STEP 3 COMPLETE: FUNCTIONS CREATED';
     RAISE NOTICE '========================================';
-    RAISE NOTICE 'Functions created: %', fn_count;
-    RAISE NOTICE 'Views created: %', view_count;
+    RAISE NOTICE 'Functions Created:';
+    RAISE NOTICE '  - has_role';
+    RAISE NOTICE '  - is_placement_rep';
+    RAISE NOTICE '  - is_coordinator';
+    RAISE NOTICE '  - is_team_leader';
+    RAISE NOTICE '  - get_user_team';
+    RAISE NOTICE '  - is_date_scheduled';
+    RAISE NOTICE '  - get_scheduled_dates';
+    RAISE NOTICE '  - update_leetcode_username_unified';
     RAISE NOTICE '';
-    RAISE NOTICE 'Functions:';
-    RAISE NOTICE '  • has_role(user_id, role_name)';
-    RAISE NOTICE '  • is_placement_rep(user_id)';
-    RAISE NOTICE '  • is_coordinator(user_id)';
-    RAISE NOTICE '  • is_team_leader(user_id)';
-    RAISE NOTICE '  • get_user_team(user_id)';
-    RAISE NOTICE '  • is_date_scheduled(date)';
-    RAISE NOTICE '';
-    RAISE NOTICE 'Views:';
-    RAISE NOTICE '  • student_attendance_summary';
-    RAISE NOTICE '  • team_attendance_summary';
-    RAISE NOTICE '';
-    RAISE NOTICE 'NEXT: Run 04_rls_policies.sql';
+    RAISE NOTICE 'NEXT: Run 04_triggers.sql';
     RAISE NOTICE '========================================';
 END $$;

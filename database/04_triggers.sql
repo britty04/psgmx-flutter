@@ -1,14 +1,19 @@
 -- ========================================
--- PSG MX PLACEMENT APP - NOTIFICATION TRIGGERS
+-- PSG MX PLACEMENT APP - TRIGGERS
 -- ========================================
--- File 6: Automate Notifications via Database Triggers
+-- File 4 of 5: Automation Triggers
 -- 
--- Automatically creates records in 'notifications' table when
--- important events occur (New Task, Attendance, etc.)
--- This ensures Realtime updates work perfectly.
+-- 1. Notification Triggers (New Task, Attendance, Milestones)
+-- 2. Maintenance Triggers (Timestamps)
+-- 
+-- Run this AFTER 03_functions.sql
 -- ========================================
 
--- 1. TRIGGER: New Daily Task Notification
+-- ========================================
+-- 1. NOTIFICATION TRIGGERS
+-- ========================================
+
+-- TRIGGER: New Daily Task Notification
 CREATE OR REPLACE FUNCTION notify_new_daily_task()
 RETURNS TRIGGER AS $$
 BEGIN
@@ -38,7 +43,7 @@ CREATE TRIGGER on_daily_task_created
     EXECUTE FUNCTION notify_new_daily_task();
 
 
--- 2. TRIGGER: New Attendance Schedule Notification
+-- TRIGGER: New Attendance Schedule Notification
 CREATE OR REPLACE FUNCTION notify_attendance_schedule()
 RETURNS TRIGGER AS $$
 BEGIN
@@ -68,10 +73,7 @@ CREATE TRIGGER on_attendance_scheduled
     EXECUTE FUNCTION notify_attendance_schedule();
 
 
--- 3. TRIGGER: LeetCode Milestone Notification (Example logic)
--- Assuming we want to notify when someone crosses a big milestone (e.g. 100 problems)
--- This requires checking the OLD vs NEW value on update.
-
+-- TRIGGER: LeetCode Milestone Notification
 CREATE OR REPLACE FUNCTION notify_leetcode_milestone()
 RETURNS TRIGGER AS $$
 DECLARE
@@ -124,8 +126,30 @@ CREATE TRIGGER on_leetcode_stat_update
     WHEN (NEW.total_solved > OLD.total_solved) -- Only on increase
     EXECUTE FUNCTION notify_leetcode_milestone();
 
--- Success Message
+-- ========================================
+-- 2. MAINTENANCE TRIGGERS
+-- ========================================
+
+-- TRIGGER: App Config Timestamp
+CREATE OR REPLACE FUNCTION update_app_config_timestamp()
+RETURNS TRIGGER AS $$
+BEGIN
+    NEW.updated_at = NOW();
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+DROP TRIGGER IF EXISTS app_config_updated_at ON app_config;
+CREATE TRIGGER app_config_updated_at
+    BEFORE UPDATE ON app_config
+    FOR EACH ROW
+    EXECUTE FUNCTION update_app_config_timestamp();
+
+-- ========================================
+-- FINISH
+-- ========================================
 DO $$
 BEGIN
-    RAISE NOTICE '✅ Notification triggers setup successfully.';
+    RAISE NOTICE '✅ Triggers & Automations setup successfully.';
+    RAISE NOTICE 'NEXT: Run 05_seed_data.sql';
 END $$;

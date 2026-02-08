@@ -1,10 +1,12 @@
 -- ========================================
--- PSG MX PLACEMENT APP - DATA INSERTION
+-- PSG MX PLACEMENT APP - SEED DATA
 -- ========================================
--- File 2 of 5: Insert All 123 Students
+-- File 5 of 5: Initial Data
 -- 
--- Populates whitelist and syncs to users table.
--- Run this AFTER 01_schema.sql
+-- 1. Whitelist (Students)
+-- 2. App Config (Default Settings)
+-- 
+-- Run this AFTER 04_triggers.sql
 -- ========================================
 
 -- Insert all 123 students into whitelist
@@ -195,19 +197,46 @@ DECLARE
     whitelist_count INT;
     users_count INT;
     leetcode_count INT;
+-- ========================================
+-- 2. APP CONFIGURATION
+-- ========================================
+
+INSERT INTO app_config (
+    min_required_version,
+    latest_version,
+    force_update,
+    update_message,
+    github_release_url,
+    emergency_block
+) VALUES (
+    '1.0.0',
+    '1.2.0',
+    false,
+    'A new version of PSGMX is available! Update now to get the latest features and improvements.',
+    'https://github.com/psgmx/psgmx-flutter/releases/latest',
+    false
+) ON CONFLICT DO NOTHING;
+
+-- ========================================
+-- VERIFICATION & FINISH
+-- ========================================
+DO $$
+DECLARE
+    whitelist_count INT;
+    users_count INT;
+    leetcode_count INT;
 BEGIN
     SELECT COUNT(*) INTO whitelist_count FROM public.whitelist;
     SELECT COUNT(*) INTO users_count FROM public.users;
     SELECT COUNT(*) INTO leetcode_count FROM public.leetcode_stats;
     
-    RAISE NOTICE '';
     RAISE NOTICE '========================================';
-    RAISE NOTICE '✅ STEP 2 COMPLETE: DATA INSERTED';
+    RAISE NOTICE '✅ SEED DATA COMPLETE';
     RAISE NOTICE '========================================';
-    RAISE NOTICE 'Whitelist entries: % (expected: 123)', whitelist_count;
+    RAISE NOTICE 'Whitelist entries: %', whitelist_count;
     RAISE NOTICE 'Users created: %', users_count;
-    RAISE NOTICE 'LeetCode usernames: %', leetcode_count;
-    RAISE NOTICE '';
-    RAISE NOTICE 'NEXT: Run 03_functions.sql';
+    RAISE NOTICE 'App Config: initialized';
+    RAISE NOTICE '========================================';
+    RAISE NOTICE 'You have successfully set up the PSGMX database!';
     RAISE NOTICE '========================================';
 END $$;

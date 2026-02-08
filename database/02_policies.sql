@@ -1,10 +1,10 @@
 -- ========================================
 -- PSG MX PLACEMENT APP - ROW LEVEL SECURITY
 -- ========================================
--- File 4 of 5: RLS Policies (Access Control)
+-- File 2 of 6: RLS Policies (Access Control)
 -- 
 -- Defines who can read/write what data.
--- Run this AFTER 03_functions.sql
+-- Run this AFTER 01_schema.sql
 -- ========================================
 
 -- ========================================
@@ -19,6 +19,8 @@ ALTER TABLE attendance_records ENABLE ROW LEVEL SECURITY;
 ALTER TABLE audit_logs ENABLE ROW LEVEL SECURITY;
 ALTER TABLE notifications ENABLE ROW LEVEL SECURITY;
 ALTER TABLE notification_reads ENABLE ROW LEVEL SECURITY;
+ALTER TABLE task_completions ENABLE ROW LEVEL SECURITY;
+ALTER TABLE app_config ENABLE ROW LEVEL SECURITY;
 
 -- ========================================
 -- USERS TABLE POLICIES
@@ -216,48 +218,98 @@ DROP POLICY IF EXISTS "notification_reads_own" ON notification_reads;
 CREATE POLICY "notification_reads_own" ON notification_reads
     FOR ALL USING (user_id = auth.uid());
 
--- ========================================
--- GRANT PERMISSIONS
--- ========================================
-GRANT USAGE ON SCHEMA public TO authenticated;
-GRANT USAGE ON SCHEMA public TO anon;
-GRANT ALL ON ALL TABLES IN SCHEMA public TO authenticated;
-GRANT SELECT ON ALL TABLES IN SCHEMA public TO anon;
-GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO authenticated;
-GRANT EXECUTE ON ALL FUNCTIONS IN SCHEMA public TO authenticated;
-GRANT EXECUTE ON ALL FUNCTIONS IN SCHEMA public TO anon;
 
 -- ========================================
--- VERIFICATION
+-- TASK_COMPLETIONS POLICIES (NEW)
+-- ========================================
+
+-- Users can read their own submissions
+DROP POLICY IF EXISTS "task_completions_read_own" ON task_completions;
+CREATE POLICY "task_completions_read_own" ON task_completions
+    FOR SELECT TO authenticated
+    USING (user_id = auth.uid());
+
+-- Team Leaders can read their team's submissions
+DROP POLICY IF EXISTS "task_completions_read_team" ON task_completions;
+CREATE POLICY "task_completions_read_team" ON task_completions
+    FOR SELECT TO authenticated
+    USING (
+        is_team_leader(auth.uid()) 
+        AND team_id = get_user_team(auth.uid())
+    );
+
+-- Placement Reps can read ALL submissions
+DROP POLICY IF EXISTS "task_completions_read_rep" ON task_completions;
+CREATE POLICY "task_completions_read_rep" ON task_completions
+    FOR SELECT TO authenticated
+    USING (is_placement_rep(auth.uid()) OR is_coordinator(auth.uid()));
+
+-- Users can insert their own completion (Pending status)
+DROP POLICY IF EXISTS "task_completions_insert_own" ON task_completions;
+CREATE POLICY "task_completions_insert_own" ON task_completions
+    FOR INSERT TO authenticated
+    WITH CHECK (user_id = auth.uid());
+
+-- Team Leaders can verify (update) their team's submissions
+DROP POLICY IF EXISTS "task_completions_update_verify" ON task_completions;
+CREATE POLICY "task_completions_update_verify" ON task_completions
+    FOR UPDATE TO authenticated
+    USING (
+        is_team_leader(auth.uid()) 
+        OR is_placement_rep(auth.uid())
+        OR is_coordinator(auth.uid())
+    );
+
+-- Users can update/delete their PENDING submissions (resubmit)
+DROP POLICY IF EXISTS "task_completions_update_own" ON task_completions;
+CREATE POLICY "task_completions_update_own" ON task_completions
+    FOR UPDATE TO authenticated
+    USING (user_id = auth.uid() AND status = 'pending');
+
+-- ========================================
+-- APP_CONFIG POLICIES
+-- ========================================
+
+DROP POLICY IF EXISTS "app_config_read_public" ON app_config;
+CREATE POLICY "app_config_read_public" ON app_config
+    FOR SELECT USING (TRUE);
+
+-- Only authenticated admins can update
+DROP POLICY IF EXISTS "app_config_update_admin" ON app_config;
+CREATE POLICY "app_config_update_admin" ON app_config
+    FOR UPDATE USING (is_placement_rep(auth.uid()) OR is_coordinator(auth.uid()));
+
+-- ========================================
+-- SUCCESS MESSAGE
 -- ========================================
 DO $$
-DECLARE
-    policy_count INT;
 BEGIN
-    SELECT COUNT(*) INTO policy_count
-    FROM pg_policies
-    WHERE schemaname = 'public';
-    
     RAISE NOTICE '';
     RAISE NOTICE '========================================';
-    RAISE NOTICE '✅ STEP 4 COMPLETE: RLS POLICIES';
+    RAISE NOTICE '✅ STEP 2 COMPLETE: RLS POLICIES';
+-- ========================================
+-- APP CONFIG POLICIES
+-- ========================================
+
+ALTER TABLE app_config ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "Allow public read access to app_config" ON app_config;
+CREATE POLICY "Allow public read access to app_config" ON app_config
+    FOR SELECT USING (true);
+
+DROP POLICY IF EXISTS "Only service role can modify app_config" ON app_config;
+CREATE POLICY "Only service role can modify app_config" ON app_config
+    FOR ALL USING (auth.role() = 'service_role')
+    WITH CHECK (auth.role() = 'service_role');
+
+-- ========================================
+-- FINISH
+-- ========================================
+DO $$
+BEGIN
     RAISE NOTICE '========================================';
-    RAISE NOTICE 'Total policies created: %', policy_count;
-    RAISE NOTICE '';
-    RAISE NOTICE 'ACCESS CONTROL SUMMARY:';
-    RAISE NOTICE '';
-    RAISE NOTICE '┌──────────────────┬──────────┬───────────────┬─────────┐';
-    RAISE NOTICE '│ Feature          │ Student  │ Team Leader   │ Pl. Rep │';
-    RAISE NOTICE '├──────────────────┼──────────┼───────────────┼─────────┤';
-    RAISE NOTICE '│ View own attend. │    ✓     │       ✓       │    ✓    │';
-    RAISE NOTICE '│ View team attend │    ✗     │       ✓       │    ✓    │';
-    RAISE NOTICE '│ View ALL attend. │    ✗     │       ✗       │    ✓    │';
-    RAISE NOTICE '│ Mark team attend │    ✗     │       ✓       │    ✓    │';
-    RAISE NOTICE '│ Mark ANY attend. │    ✗     │       ✗       │    ✓    │';
-    RAISE NOTICE '│ Edit ANY attend. │    ✗     │       ✗       │    ✓    │';
-    RAISE NOTICE '│ Delete attend.   │    ✗     │       ✗       │    ✓    │';
-    RAISE NOTICE '└──────────────────┴──────────┴───────────────┴─────────┘';
-    RAISE NOTICE '';
-    RAISE NOTICE 'NEXT: Run 05_sample_data.sql (Optional)';
+    RAISE NOTICE '✅ RLS Policies setup successfully.';
+    RAISE NOTICE 'Policies applied to all 13 tables.';
+    RAISE NOTICE 'NEXT: Run 03_functions.sql';
     RAISE NOTICE '========================================';
 END $$;
