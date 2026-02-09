@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 import '../../providers/user_provider.dart';
 import '../../providers/leetcode_provider.dart';
@@ -11,7 +12,6 @@ import '../../services/attendance_service.dart';
 import '../../services/task_completion_service.dart';
 import '../../services/attendance_streak_service.dart';
 import '../../services/performance_service.dart';
-import '../../services/github_service.dart';
 import '../../models/attendance_streak.dart';
 import '../../core/theme/app_dimens.dart';
 import '../widgets/premium_card.dart';
@@ -630,90 +630,106 @@ class _HomeScreenState extends State<HomeScreen> with UpdateCheckMixin {
   Widget _buildGitHubStarButton(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     
-    return FutureBuilder<GitHubRepoStats>(
-      future: GitHubService.fetchRepoStats(),
-      builder: (context, snapshot) {
-        final stats = snapshot.data;
-        
-        return InkWell(
-          onTap: () => _launchGitHubRepo(context),
-          borderRadius: BorderRadius.circular(10),
-          child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                colors: isDark 
-                  ? [const Color(0xFF24292E), const Color(0xFF1E2226)]
-                  : [const Color(0xFFEFF3F6), const Color(0xFFE6EBF1)],
-              ),
-              borderRadius: BorderRadius.circular(10),
-              border: Border.all(
-                color: isDark ? Colors.white.withValues(alpha: 0.1) : Colors.black.withValues(alpha: 0.1),
-              ),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.1),
-                  blurRadius: 4,
-                  offset: const Offset(0, 2),
-                ),
-              ],
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: () => _launchGitHubRepo(context),
+        borderRadius: BorderRadius.circular(20),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              colors: isDark 
+                ? [const Color(0xFF24292E), const Color(0xFF1A1D21)]
+                : [Colors.white, const Color(0xFFFAFBFC)],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
             ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                // Star icon and count
-                Icon(
-                  Icons.star_rounded, 
-                  size: 14, 
-                  color: isDark ? const Color(0xFFFFD700) : const Color(0xFFE3B341)
-                ),
-                const SizedBox(width: 3),
-                Text(
-                  stats?.formattedStars ?? '...',
-                  style: TextStyle(
-                    fontSize: 11,
-                    fontWeight: FontWeight.bold,
-                    color: isDark ? Colors.white : Colors.black87,
-                  ),
-                ),
-                const SizedBox(width: 8),
-                // Fork icon and count
-                Icon(
-                  Icons.call_split_rounded,
-                  size: 14,
-                  color: isDark ? Colors.grey.shade400 : Colors.grey.shade700,
-                ),
-                const SizedBox(width: 3),
-                Text(
-                  stats?.formattedForks ?? '...',
-                  style: TextStyle(
-                    fontSize: 11,
-                    fontWeight: FontWeight.bold,
-                    color: isDark ? Colors.white : Colors.black87,
-                  ),
-                ),
-              ],
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(
+              color: isDark 
+                ? Colors.white.withValues(alpha: 0.15) 
+                : Colors.black.withValues(alpha: 0.08),
+              width: 1.5,
             ),
+            boxShadow: [
+              BoxShadow(
+                color: isDark 
+                  ? Colors.black.withValues(alpha: 0.3)
+                  : Colors.black.withValues(alpha: 0.08),
+                blurRadius: 8,
+                offset: const Offset(0, 2),
+              ),
+            ],
           ),
-        );
-      },
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(
+                Icons.star,
+                size: 18,
+                color: Color(0xFFFFD700),
+              ),
+              const SizedBox(width: 6),
+              Text(
+                'Star on GitHub',
+                style: GoogleFonts.inter(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                  color: isDark ? Colors.white : const Color(0xFF24292E),
+                  letterSpacing: -0.2,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 
   Future<void> _launchGitHubRepo(BuildContext context) async {
     final Uri url = Uri.parse('https://github.com/brittytino/psgmx-flutter');
-    if (!await launchUrl(url, mode: LaunchMode.externalApplication)) {
-      if (context.mounted) {
+    try {
+      final launched = await launchUrl(url, mode: LaunchMode.externalApplication);
+      if (launched && context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Could not open GitHub repository')),
+          SnackBar(
+            content: Row(
+              children: [
+                const Icon(Icons.star, color: Color(0xFFFFD700), size: 20),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    'Please tap the ⭐ Star button on GitHub!',
+                    style: GoogleFonts.inter(fontWeight: FontWeight.w500),
+                  ),
+                ),
+              ],
+            ),
+            backgroundColor: const Color(0xFF24292E),
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            duration: const Duration(seconds: 4),
+          ),
+        );
+      } else if (!launched && context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: const Text('Could not open GitHub repository'),
+            backgroundColor: Colors.red.shade700,
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          ),
         );
       }
-    } else {
+    } catch (e) {
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('🌟 Thanks! Please tap the Star button on GitHub!'),
-            duration: Duration(seconds: 4),
+          SnackBar(
+            content: const Text('Error opening GitHub'),
+            backgroundColor: Colors.red.shade700,
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
           ),
         );
       }
@@ -755,54 +771,18 @@ class _HomeScreenState extends State<HomeScreen> with UpdateCheckMixin {
   }
 }
 
-class _NotificationBell extends StatefulWidget {
+class _NotificationBell extends StatelessWidget {
   const _NotificationBell();
 
   @override
-  State<_NotificationBell> createState() => _NotificationBellState();
-}
-
-class _NotificationBellState extends State<_NotificationBell> {
-  int _unreadCount = 0;
-  bool _isLoading = false;
-
-  @override
-  void initState() {
-    super.initState();
-    _loadNotifications();
-  }
-
-  Future<void> _loadNotifications() async {
-    if (_isLoading) return;
-    
-    setState(() => _isLoading = true);
-    
-    try {
-      final notifService = context.read<NotificationService>();
-      final notifications = await notifService.getNotifications();
-      
-      if (mounted) {
-        setState(() {
-          _unreadCount = notifications.where((n) => n.isRead != true).length;
-          _isLoading = false;
-        });
-      }
-    } catch (e) {
-      if (mounted) {
-        setState(() => _isLoading = false);
-      }
-    }
-  }
-
-  @override
   Widget build(BuildContext context) {
-    return NotificationBellIcon(
-      unreadCount: _unreadCount,
-      onTap: () async {
-        Navigator.pushNamed(context, '/notifications');
-        // Refresh count after returning from notifications
-        await Future.delayed(const Duration(milliseconds: 500));
-        _loadNotifications();
+    return Consumer<NotificationService>(
+      builder: (context, notifService, _) {
+        // Use cached notifications to prevent flickering
+        final unreadCount = notifService.notifications
+            .where((n) => n.isRead != true)
+            .length;
+        return NotificationBellIcon(unreadCount: unreadCount);
       },
     );
   }

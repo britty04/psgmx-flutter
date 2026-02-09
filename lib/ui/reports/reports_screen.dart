@@ -28,13 +28,12 @@ class ReportsScreen extends StatelessWidget {
             floating: true,
             actions: [
               Consumer<NotificationService>(
-                builder: (context, notifService, _) => FutureBuilder<List<dynamic>>(
-                  future: notifService.getNotifications(),
-                  builder: (context, snapshot) {
-                    final unreadCount = snapshot.data?.where((n) => n.isRead != true).length ?? 0;
-                    return NotificationBellIcon(unreadCount: unreadCount);
-                  },
-                ),
+                builder: (context, notifService, _) {
+                  final unreadCount = notifService.notifications
+                      .where((n) => n.isRead != true)
+                      .length;
+                  return NotificationBellIcon(unreadCount: unreadCount);
+                },
               ),
             ],
           ),
