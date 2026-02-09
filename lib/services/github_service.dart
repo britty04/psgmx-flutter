@@ -24,7 +24,16 @@ class GitHubService {
 
     try {
       final url = Uri.parse('$_apiBaseUrl/repos/$_repoOwner/$_repoName');
-      final response = await http.get(url);
+      final response = await http.get(
+        url,
+        headers: {
+          'Accept': 'application/vnd.github.v3+json',
+          'User-Agent': 'PSGMX-Flutter-App',
+        },
+      ).timeout(
+        const Duration(seconds: 10),
+        onTimeout: () => throw Exception('GitHub API timeout'),
+      );
 
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
@@ -36,6 +45,8 @@ class GitHubService {
         return _cachedStats!;
       } else {
         debugPrint('GitHub API error: ${response.statusCode}');
+        // Return cached data if available on error
+        if (_cachedStats != null) return _cachedStats!;
         return const GitHubRepoStats(stars: 0, forks: 0);
       }
     } catch (e) {
