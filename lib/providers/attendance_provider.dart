@@ -180,7 +180,8 @@ class AttendanceProvider extends ChangeNotifier {
   }
 
   Future<void> submitAttendance(String? teamId, Map<String, String> statusMap, {bool isRep = false}) async {
-    if (!isRep && _hasSubmittedToday) throw Exception("Already submitted for today");
+    // UPDATED: Removed check to allow updating attendance for the same day
+    // if (!isRep && _hasSubmittedToday) throw Exception("Already submitted for today");
     
     final today = DateTime.now().toIso8601String().split('T')[0];
     final user = _supabaseService.client.auth.currentUser;
