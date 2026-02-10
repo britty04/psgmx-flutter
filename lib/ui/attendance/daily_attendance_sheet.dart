@@ -182,7 +182,10 @@ class _DailyAttendanceSheetState extends State<DailyAttendanceSheet> {
               ),
               Consumer<AttendanceProvider>(
                 builder: (context, provider, _) { 
-                  if (provider.hasSubmittedToday) return const SizedBox.shrink();
+                  // Hide mark all if already submitted (for TLs) or just generally good UX
+                  final isRep = context.read<UserProvider>().isPlacementRep;
+                  if (provider.hasSubmittedToday && !isRep) return const SizedBox.shrink();
+                  
                   return TextButton.icon(
                     onPressed: () {
                          setState(() {
@@ -220,9 +223,8 @@ class _DailyAttendanceSheetState extends State<DailyAttendanceSheet> {
                   );
                 }
 
-                // ALLOW Team Leaders to edit: Removed the return _buildSubmittedView() block
-                // which prevented editing if already submitted.
-                // Logic: Team Leaders can now see the list and toggle switches even if hasSubmittedToday is true.
+                final isRep = context.read<UserProvider>().isPlacementRep;
+                final isReadOnly = !isRep && provider.hasSubmittedToday;
                 
                 // Initialize checks
                 _ensureStatusMapInitialized(provider.teamMembers);
@@ -324,7 +326,7 @@ class _DailyAttendanceSheetState extends State<DailyAttendanceSheet> {
                                   size: 16,
                                 );
                               }),
-                              onChanged: (val) {
+                              onChanged: isReadOnly ? null : (val) {
                                 setState(() {
                                   _statusMap[member.uid] = val ? 'PRESENT' : 'ABSENT';
                                 });
@@ -346,6 +348,31 @@ class _DailyAttendanceSheetState extends State<DailyAttendanceSheet> {
           Consumer<AttendanceProvider>(
             builder: (context, provider, _) {
               final isSubmitting = provider.isLoading; // Use isLoading or add dedicated flag
+              final isRep = context.read<UserProvider>().isPlacementRep;
+
+              if (!isRep && provider.hasSubmittedToday) {
+                 return Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: theme.colorScheme.primaryContainer.withValues(alpha: 0.3),
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(Icons.check_circle, color: theme.colorScheme.primary),
+                        const SizedBox(width: 8),
+                        Text(
+                          "Attendance Submitted",
+                          style: GoogleFonts.inter(
+                            fontWeight: FontWeight.bold,
+                            color: theme.colorScheme.primary,
+                          ),
+                        ),
+                      ],
+                    ),
+                 );
+              }
 
               return FilledButton(
                 onPressed: isSubmitting ? null : () => _submit(context, provider),
@@ -439,24 +466,179 @@ class _DailyAttendanceSheetState extends State<DailyAttendanceSheet> {
 
     // Validation checks
     final absentCount = _statusMap.values.where((s) => s == 'ABSENT').length;
-    final total = provider.teamMembers.length;
+    final presentCount = _statusMap.values.where((s) => s == 'PRESENT').length;
+    final absentees = provider.teamMembers
+        .where((m) => _statusMap[m.uid] == 'ABSENT')
+        .toList();
 
     if (!context.mounted) return;
 
     // Show confirmation
-    final confirm = await showDialog<bool>(
-      context: context, 
-      builder: (ctx) => AlertDialog(
-        title: const Text("Confirm Submission"),
-        content: Text("Marking $absentCount out of $total students as ABSENT.\n\nThis cannot be undone."),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text("Cancel")),
-          FilledButton(
-            onPressed: () => Navigator.pop(ctx, true), 
-            child: const Text("Confirm")
-          ),
-        ],
-      )
+    final confirm = await showModalBottomSheet<bool>(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (ctx) => Container(
+        decoration: BoxDecoration(
+          color: Theme.of(context).colorScheme.surface,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+        ),
+        padding: const EdgeInsets.fromLTRB(24, 16, 24, 24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            // Handle
+            Center(
+              child: Container(
+                width: 40,
+                height: 4,
+                margin: const EdgeInsets.only(bottom: 24),
+                decoration: BoxDecoration(
+                  color: Theme.of(context).dividerColor.withValues(alpha: 0.2),
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+            ),
+            
+            Text(
+              "Verify Attendance",
+              style: GoogleFonts.poppins(
+                fontSize: 22,
+                fontWeight: FontWeight.bold,
+              ),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 8),
+            Text(
+              "Please review the attendance details before submitting.",
+              style: GoogleFonts.inter(
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+                fontSize: 14,
+              ),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 24),
+
+            // Stats Card
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: Theme.of(context).colorScheme.surfaceContainer,
+                borderRadius: BorderRadius.circular(16),
+              ),
+              child: Row(
+                children: [
+                   Expanded(
+                     child: _buildStatItem(
+                       context, 
+                       "Present", 
+                       presentCount, 
+                       Colors.green
+                     ),
+                   ),
+                   Container(width: 1, height: 40, color: Theme.of(context).dividerColor),
+                   Expanded(
+                     child: _buildStatItem(
+                       context, 
+                       "Absent", 
+                       absentCount, 
+                       Theme.of(context).colorScheme.error
+                     ),
+                   ),
+                ],
+              ),
+            ),
+            
+            if (absentees.isNotEmpty) ...[
+              const SizedBox(height: 24),
+              Text(
+                "Marked as Absent:",
+                style: GoogleFonts.inter(
+                  fontWeight: FontWeight.w600,
+                  fontSize: 14,
+                ),
+              ),
+              const SizedBox(height: 12),
+              Container(
+                constraints: BoxConstraints(
+                  maxHeight: MediaQuery.of(context).size.height * 0.2,
+                ),
+                child: ListView.separated(
+                  shrinkWrap: true,
+                  itemCount: absentees.length,
+                  separatorBuilder: (_, __) => const SizedBox(height: 8),
+                  itemBuilder: (ctx, idx) {
+                    final student = absentees[idx];
+                    return Row(
+                      children: [
+                        CircleAvatar(
+                          radius: 12,
+                          backgroundColor: Theme.of(context).colorScheme.errorContainer,
+                          child: Text(
+                            student.name.isNotEmpty ? student.name[0] : '?',
+                            style: TextStyle(
+                              fontSize: 10,
+                              color: Theme.of(context).colorScheme.onErrorContainer,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Text(
+                          student.name,
+                          style: GoogleFonts.inter(
+                            fontWeight: FontWeight.w500,
+                            fontSize: 14,
+                          ),
+                        ),
+                      ],
+                    );
+                  },
+                ),
+              ),
+            ],
+
+            const SizedBox(height: 32),
+            
+            Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton(
+                    onPressed: () => Navigator.pop(ctx, false),
+                    style: OutlinedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(vertical: 16),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      side: BorderSide(color: Theme.of(context).dividerColor),
+                    ),
+                    child: const Text("Edit"),
+                  ),
+                ),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: FilledButton(
+                    onPressed: () => Navigator.pop(ctx, true),
+                    style: FilledButton.styleFrom(
+                      backgroundColor: Theme.of(context).colorScheme.primary,
+                      padding: const EdgeInsets.symmetric(vertical: 16),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                    child: Text(
+                      provider.hasSubmittedToday ? "Update" : "Confirm",
+                      style: const TextStyle(fontWeight: FontWeight.bold),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            SizedBox(height: MediaQuery.of(context).viewInsets.bottom),
+          ],
+        ),
+      ),
     );
 
     if (confirm != true) return;
@@ -470,7 +652,7 @@ class _DailyAttendanceSheetState extends State<DailyAttendanceSheet> {
       if (context.mounted) {
         if (!isRep) {
           context.pop(); // Close for TLs
-          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Attendance Submitted ✅")));
+          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Attendance Submitted Successfully ✅")));
         } else {
            ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Changes Saved ✅")));
         }
@@ -480,5 +662,27 @@ class _DailyAttendanceSheetState extends State<DailyAttendanceSheet> {
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Error: $e")));
       }
     }
+  }
+
+  Widget _buildStatItem(BuildContext context, String label, int count, Color color) {
+    return Column(
+      children: [
+        Text(
+          count.toString().padLeft(2, '0'),
+          style: GoogleFonts.poppins(
+            fontSize: 24,
+            fontWeight: FontWeight.bold,
+            color: color,
+          ),
+        ),
+        Text(
+          label,
+          style: GoogleFonts.inter(
+            fontSize: 12,
+            color: Theme.of(context).colorScheme.onSurfaceVariant,
+          ),
+        ),
+      ],
+    );
   }
 }

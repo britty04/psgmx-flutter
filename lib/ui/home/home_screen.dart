@@ -581,6 +581,47 @@ class _HomeScreenState extends State<HomeScreen> with UpdateCheckMixin {
                         final hasSubmitted = snapshot.data?['hasSubmitted'] ?? false;
                         final markedCount = snapshot.data?['markedCount'] ?? 0;
                         
+                        // Strict specific rule: If TL and already marked, SHOW completed state (not hidden)
+                        if (userProvider.isTeamLeader && !userProvider.isPlacementRep && hasSubmitted) {
+                           return PremiumCard(
+                             color: Theme.of(context).colorScheme.tertiaryContainer.withValues(alpha: 0.4),
+                             onTap: () {}, // No action
+                             child: Row(
+                               children: [
+                                 Container(
+                                   padding: const EdgeInsets.all(AppSpacing.sm),
+                                   decoration: BoxDecoration(
+                                     color: Theme.of(context).colorScheme.tertiary,
+                                     shape: BoxShape.circle,
+                                   ),
+                                   child: const Icon(Icons.check_rounded, color: Colors.white),
+                                 ),
+                                 const SizedBox(width: AppSpacing.md),
+                                 Expanded(
+                                   child: Column(
+                                     crossAxisAlignment: CrossAxisAlignment.start,
+                                     children: [
+                                       Text(
+                                         "All Caught Up!",
+                                         style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                                           fontWeight: FontWeight.bold,
+                                           color: Theme.of(context).colorScheme.onTertiaryContainer,
+                                         ),
+                                       ),
+                                       Text(
+                                         "Attendance marked for today",
+                                         style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                                           color: Theme.of(context).colorScheme.onTertiaryContainer.withValues(alpha: 0.8),
+                                         ),
+                                       ),
+                                     ],
+                                   ),
+                                 ),
+                               ],
+                             ),
+                           );
+                        }
+                        
                         return AttendanceActionCard(
                           onTap: () => _showAttendanceSheet(context),
                           hasSubmitted: hasSubmitted,

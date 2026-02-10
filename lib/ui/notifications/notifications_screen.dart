@@ -57,102 +57,60 @@ class _NotificationsScreenState extends State<NotificationsScreen>
       appBar: AppBar(
         elevation: 0,
         backgroundColor: colorScheme.surface,
+        centerTitle: true,
         title: Text(
           'Notifications',
           style: GoogleFonts.poppins(
             fontWeight: FontWeight.w600,
-            fontSize: 24,
+            fontSize: 20,
             color: colorScheme.onSurface,
           ),
         ),
         actions: [
-          // Clear All / Mark All Read Button
-          if (allNotifications.isNotEmpty)
-            TextButton.icon(
-              onPressed: () async {
-                await notifService.markAllAsRead();
-                if (context.mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: const Text('All marked as read'),
-                      behavior: SnackBarBehavior.floating,
-                      shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(10)),
-                      backgroundColor: colorScheme.secondary,
-                    ),
-                  );
-                }
-              },
-              icon: Icon(Icons.done_all_rounded,
-                  size: 18, color: colorScheme.primary),
-              label: Text(
-                'Mark all read',
-                style: GoogleFonts.inter(
-                  fontWeight: FontWeight.w600,
-                  fontSize: 12,
-                  color: colorScheme.primary,
+          if (unreadNotifications.isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.only(right: 8.0),
+              child: TextButton.icon(
+                onPressed: () async {
+                  await notifService.markAllAsRead();
+                  if (context.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: const Text('All marked as read'),
+                        behavior: SnackBarBehavior.floating,
+                        shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(10)),
+                        margin: const EdgeInsets.all(16),
+                        backgroundColor: colorScheme.primary,
+                      ),
+                    );
+                  }
+                },
+                icon: Icon(Icons.done_all_rounded,
+                    size: 18, color: colorScheme.primary),
+                label: Text(
+                  'Mark all read',
+                  style: GoogleFonts.inter(
+                    fontWeight: FontWeight.w600,
+                    fontSize: 12,
+                    color: colorScheme.primary,
+                  ),
+                ),
+                style: TextButton.styleFrom(
+                  splashFactory: NoSplash.splashFactory,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(20),
+                  ),
                 ),
               ),
-              style: TextButton.styleFrom(
-                padding: const EdgeInsets.symmetric(horizontal: 16),
-                splashFactory: NoSplash.splashFactory,
-              ),
             ),
-          PopupMenuButton<String>(
-            icon: Icon(Icons.more_vert_rounded, color: colorScheme.onSurface),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(16),
-            ),
-            position: PopupMenuPosition.under,
-            onSelected: (value) async {
-              if (value == 'test') {
-                // Request permissions first
-                final hasPermission = await notifService.requestPermissions();
-                if (!hasPermission && context.mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('Please enable notifications in settings'),
-                      duration: Duration(seconds: 3),
-                    ),
-                  );
-                  return;
-                }
-
-                await notifService.showTestNotification();
-                if (context.mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('Test notification sent! 🔔'),
-                      duration: Duration(seconds: 2),
-                    ),
-                  );
-                }
-              }
-            },
-            itemBuilder: (context) => [
-              PopupMenuItem(
-                value: 'test',
-                child: Row(
-                  children: [
-                    Icon(Icons.notification_add,
-                        size: 20, color: colorScheme.onSurface),
-                    const SizedBox(width: 12),
-                    Text(
-                      'Test Notification',
-                      style: GoogleFonts.inter(color: colorScheme.onSurface),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(width: 8),
         ],
         bottom: PreferredSize(
-          preferredSize: const Size.fromHeight(60),
+          preferredSize: const Size.fromHeight(70),
           child: Container(
             margin: const EdgeInsets.symmetric(
                 horizontal: AppSpacing.lg, vertical: AppSpacing.sm),
+            height: 45,
             decoration: BoxDecoration(
               color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
               borderRadius: BorderRadius.circular(25),
@@ -168,16 +126,21 @@ class _NotificationsScreenState extends State<NotificationsScreen>
                   BoxShadow(
                     color: colorScheme.primary.withValues(alpha: 0.3),
                     spreadRadius: 0,
-                    blurRadius: 10,
-                    offset: const Offset(0, 4),
+                    blurRadius: 8,
+                    offset: const Offset(0, 2),
                   ),
                 ],
               ),
               labelColor: colorScheme.onPrimary,
               unselectedLabelColor: colorScheme.onSurfaceVariant,
-              labelStyle: GoogleFonts.inter(fontWeight: FontWeight.w600),
-              unselectedLabelStyle:
-                  GoogleFonts.inter(fontWeight: FontWeight.w500),
+              labelStyle: GoogleFonts.inter(
+                fontWeight: FontWeight.w600,
+                fontSize: 13,
+              ),
+              unselectedLabelStyle: GoogleFonts.inter(
+                fontWeight: FontWeight.w500,
+                fontSize: 13,
+              ),
               padding: const EdgeInsets.all(4),
               tabs: [
                 const Tab(text: 'All'),
@@ -187,12 +150,12 @@ class _NotificationsScreenState extends State<NotificationsScreen>
                     children: [
                       const Text('Unread'),
                       if (unreadNotifications.isNotEmpty) ...[
-                        const SizedBox(width: 6),
+                        const SizedBox(width: 8),
                         Container(
-                          padding: const EdgeInsets.all(5),
+                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                           decoration: BoxDecoration(
                             color: colorScheme.error,
-                            shape: BoxShape.circle,
+                            borderRadius: BorderRadius.circular(10),
                           ),
                           child: Text(
                             unreadNotifications.length > 9
@@ -202,7 +165,6 @@ class _NotificationsScreenState extends State<NotificationsScreen>
                               color: Colors.white,
                               fontSize: 10,
                               fontWeight: FontWeight.bold,
-                              height: 1, // Fix alignment
                             ),
                           ),
                         ),
@@ -219,25 +181,31 @@ class _NotificationsScreenState extends State<NotificationsScreen>
       body: RefreshIndicator(
         onRefresh: notifService.getNotifications,
         color: colorScheme.primary,
-        child: allNotifications.isEmpty
-            ? Stack(
-                children: [
-                  ListView(), // Pull to refresh area
-                  _EmptyState(),
-                ],
-              )
-            : TabBarView(
-                controller: _tabController,
-                children: [
-                  _NotificationList(notifications: allNotifications),
-                  _NotificationList(notifications: unreadNotifications),
-                  _NotificationList(notifications: importantNotifications),
-                ],
-              ),
+        child: notifService.isLoading && allNotifications.isEmpty
+            ? Center(child: CircularProgressIndicator(color: colorScheme.primary))
+            : allNotifications.isEmpty
+                ? CustomScrollView(
+                    physics: const AlwaysScrollableScrollPhysics(),
+                    slivers: [
+                      SliverFillRemaining(
+                        hasScrollBody: false,
+                        child: Center(child: _EmptyState()),
+                      ),
+                    ],
+                  )
+                : TabBarView(
+                    controller: _tabController,
+                    children: [
+                      _NotificationList(notifications: allNotifications),
+                      _NotificationList(notifications: unreadNotifications),
+                      _NotificationList(notifications: importantNotifications),
+                    ],
+                  ),
       ),
     );
   }
 }
+
 
 class _NotificationList extends StatelessWidget {
   final List<model.AppNotification> notifications;

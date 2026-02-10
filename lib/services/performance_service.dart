@@ -223,26 +223,46 @@ class PerformanceService {
   /// Announce milestone achievement via notification
   Future<void> announceMilestone(MilestoneAchievement achievement) async {
     try {
-      // Local notification for the user (persist to DB)
-      await _notificationService.showNotification(
-        id: 902 + achievement.milestone,
-        title: '🎉 Milestone Reached!',
-        body:
-            'Congratulations! You\'ve solved ${achievement.milestone} problems on LeetCode! Keep going! 🚀',
-        type: NotificationType.motivation,
-        channel: 'psgmx_channel_main',
-        persistToDatabase: true, // Production-grade: Save to DB
-      );
+      const title = '🎉 Milestone Achievement!';
+      final message = '${achievement.userName} just crossed ${achievement.milestone} problems on LeetCode! 🌟';
+      
+      // 1. Check for duplicates in DB to prevent multiple users from announcing the same milestone
+      final existing = await _supabase
+          .from('notifications')
+          .select('id')
+          .eq('title', title)
+          .ilike('message', '%${achievement.userName}%${achievement.milestone}%')
+          .maybeSingle();
+          
+      if (existing != null) {
+        debugPrint('[PerformanceService] Milestone already announced for ${achievement.userName}');
+        return;
+      }
 
-      // Create announcement in database for everyone to see
+      // 2. Insert into database (Global Announcement)
+      // Note: We use 'motivation' as the type, which maps to allowed DB types
       await _supabase.from('notifications').insert({
-        'title': '🎉 Milestone Achievement!',
-        'body':
-            '${achievement.userName} just crossed ${achievement.milestone} problems on LeetCode! 🌟',
-        'type': 'motivation',
-        'is_read': false,
-        'created_at': DateTime.now().toIso8601String(),
+        'title': title,
+        'message': message, // Correct column name
+        'notification_type': 'motivation', // Valid DB type
+        'tone': 'friendly',
+        'target_audience': 'all', // Everyone should see this
+        'created_by': _supabase.auth.currentUser?.id,
+        'is_active': true,
+        'generated_at': DateTime.now().toIso8601String(),
       });
+      
+      // 3. Trigger local notification only for the achiever (if it's the current user)
+      final currentUser = _supabase.auth.currentUser;
+      if (currentUser != null && currentUser.id == achievement.userId) {
+         await _notificationService.showNotification(
+          id: 902 + achievement.milestone,
+          title: '🎉 Milestone Reached!',
+          body: 'Congratulations! You\'ve solved ${achievement.milestone} problems on LeetCode! Keep going! 🚀',
+          type: NotificationType.motivation,
+          persistToDatabase: false, // Already added to DB above as announcement
+        );
+      }
 
       debugPrint(
           '[PerformanceService] Milestone announced: ${achievement.userName} - ${achievement.milestone}');

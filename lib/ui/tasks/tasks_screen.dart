@@ -769,7 +769,7 @@ class _RepTasksView extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return DefaultTabController(
-        length: 4, // Changed from 3 to 4
+        length: 3,
         child: Scaffold(
           body: NestedScrollView(
             headerSliverBuilder: (context, innerBoxIsScrolled) => [
@@ -791,8 +791,7 @@ class _RepTasksView extends StatelessWidget {
                       ),
                     ),
                     child: TabBar(
-                      isScrollable: true, // Changed to true for 4 tabs
-                      tabAlignment: TabAlignment.start,
+                      isScrollable: false, // Centered alignment
                       indicatorSize: TabBarIndicatorSize.tab,
                       indicator: BoxDecoration(
                         border: Border(
@@ -812,10 +811,9 @@ class _RepTasksView extends StatelessWidget {
                         fontSize: 14,
                       ),
                       tabs: const [
-                        Tab(text: "MY TASKS"), // NEW: Personal tasks
-                        Tab(text: "TASKS"),
-                        Tab(text: "NEW ENTRY"),
-                        Tab(text: "BULK UPLOAD"),
+                        Tab(text: "My Tasks"),
+                        Tab(text: "All Tasks"),
+                        Tab(text: "Upload Task"),
                       ],
                     ),
                   ),
@@ -825,14 +823,78 @@ class _RepTasksView extends StatelessWidget {
             body: const TabBarView(
               physics: NeverScrollableScrollPhysics(),
               children: [
-                _StudentTasksView(), // NEW: Rep's personal tasks
+                _StudentTasksView(),
                 _RepTaskManagementView(),
-                _SingleEntryForm(),
-                _BulkUploadForm(),
+                _UploadTaskSelectionView(),
               ],
             ),
           ),
         ));
+
+  }
+}
+
+class _UploadTaskSelectionView extends StatefulWidget {
+  const _UploadTaskSelectionView();
+
+  @override
+  State<_UploadTaskSelectionView> createState() => _UploadTaskSelectionViewState();
+}
+
+class _UploadTaskSelectionViewState extends State<_UploadTaskSelectionView> with SingleTickerProviderStateMixin {
+  late TabController _tabController;
+
+  @override
+  void initState() {
+    super.initState();
+    _tabController = TabController(length: 2, vsync: this);
+  }
+
+  @override
+  void dispose() {
+    _tabController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        Container(
+          margin: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: Theme.of(context).colorScheme.surfaceContainerHighest,
+            borderRadius: BorderRadius.circular(25),
+          ),
+          child: TabBar(
+            controller: _tabController,
+            indicator: BoxDecoration(
+              color: Theme.of(context).colorScheme.primary,
+              borderRadius: BorderRadius.circular(25),
+            ),
+            indicatorSize: TabBarIndicatorSize.tab,
+            labelColor: Theme.of(context).colorScheme.onPrimary,
+            unselectedLabelColor: Theme.of(context).colorScheme.onSurfaceVariant,
+            dividerColor: Colors.transparent,
+            padding: const EdgeInsets.all(4),
+            tabs: const [
+              Tab(text: "New Entry"),
+              Tab(text: "Bulk Upload"),
+            ],
+          ),
+        ),
+        Expanded(
+          child: TabBarView(
+            controller: _tabController,
+            physics: const NeverScrollableScrollPhysics(),
+            children: const [
+              _SingleEntryForm(),
+              _BulkUploadForm(),
+            ],
+          ),
+        ),
+      ],
+    );
   }
 }
 
