@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:flutter/foundation.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../models/leetcode_stats.dart';
 import '../services/supabase_service.dart';
 import '../services/notification_service.dart';
@@ -258,7 +259,8 @@ class LeetCodeProvider extends ChangeNotifier {
       await fetchAllUsers();
       
       // Check and notify POTD (run in background)
-      checkAndNotifyPOTD();
+      // checkAndNotifyPOTD(); // Moving to a safer place or ensuring it has checks
+      _checkPotdDebounced();
     } catch (e) {
       debugPrint('Error loading users from database: $e');
     } finally {
@@ -660,20 +662,29 @@ class LeetCodeProvider extends ChangeNotifier {
     }
   }
 
+  void _checkPotdDebounced() async {
+    // Only check POTD if enough time has passed since last check to avoid API spam
+    // This is a UI-level check, actual notification logic also has day-check
+    await checkAndNotifyPOTD();
+  }
+
   /// Check for POTD and send notification if enabled
   Future<void> checkAndNotifyPOTD() async {
     try {
-      // Check user preference
-      final user = _supabaseService.client.auth.currentUser;
-      if (user == null) return;
+      // Check if already notified/checked today
+      final prefs = await SharedPreferences.getInstance();
+      final now = DateTime.now();
+      final todayStr = '${now.year}-${now.month}-${now.day}';
+      const lastCheckKey = 'leetcode_potd_last_check_date';
       
-      final userData = await _supabaseService.client
-          .from('users')
-          .select('leetcode_notifications_enabled')
-          .eq('id', user.id)
-          .maybeSingle();
-          
-      if (userData == null || userData['leetcode_notifications_enabled'] != true) {
+      if (prefs.getString(lastCheckKey) == todayStr) {
+        debugPrint('[LeetCode] Already checked POTD for today ($todayStr)');
+        return;
+      }
+
+      // Check user preference using the centralized service
+      final shouldSend = await NotificationService().shouldSendNotification('leetcode');
+      if (!shouldSend) {
         return; // Notifications disabled
       }
 
@@ -683,8 +694,12 @@ class LeetCodeProvider extends ChangeNotifier {
           id: 9999, // Fixed ID for daily updates
           title: 'LeetCode POTD: ${potd['title']}',
           body: '${potd['difficulty']} • AR: ${potd['acRate']}',
+          type: NotificationType.leetcode, // Ensure correct type
           payload: 'https://leetcode.com${potd['link']}',
         );
+        
+        // Mark as done for today
+        await prefs.setString(lastCheckKey, todayStr);
         debugPrint('[LeetCode] POTD Notification Sent: ${potd['title']}');
       }
     } catch (e) {

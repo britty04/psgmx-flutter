@@ -60,7 +60,7 @@ class _DailyAttendanceSheetState extends State<DailyAttendanceSheet> {
         if (isRep && provider.statusMap.containsKey(m.uid)) {
           _statusMap[m.uid] = provider.statusMap[m.uid]!;
         } else {
-          _statusMap[m.uid] = 'PRESENT';
+          _statusMap[m.uid] = 'ABSENT';
         }
       }
     }
@@ -218,7 +218,9 @@ class _DailyAttendanceSheetState extends State<DailyAttendanceSheet> {
                   );
                 }
 
-                if (provider.hasSubmittedToday && !context.read<UserProvider>().isPlacementRep) return _buildSubmittedView();
+                // ALLOW Team Leaders to edit: Removed the return _buildSubmittedView() block
+                // which prevented editing if already submitted.
+                // Logic: Team Leaders can now see the list and toggle switches even if hasSubmittedToday is true.
                 
                 // Initialize checks
                 _ensureStatusMapInitialized(provider.teamMembers);
@@ -338,17 +340,13 @@ class _DailyAttendanceSheetState extends State<DailyAttendanceSheet> {
           
           const SizedBox(height: AppSpacing.lg),
           
-          // Submit Button
+          // Submit / Update Button
           Consumer<AttendanceProvider>(
             builder: (context, provider, _) {
-              if (provider.hasSubmittedToday) {
-                return OutlinedButton(
-                   onPressed: () => context.pop(),
-                   child: const Text("Close"),
-                );
-              }
+              final isSubmitting = provider.isLoading; // Use isLoading or add dedicated flag
+
               return FilledButton(
-                onPressed: () => _submit(context, provider),
+                onPressed: isSubmitting ? null : () => _submit(context, provider),
                 style: FilledButton.styleFrom(
                   backgroundColor: theme.colorScheme.primary,
                   padding: const EdgeInsets.symmetric(vertical: 18),
@@ -356,7 +354,7 @@ class _DailyAttendanceSheetState extends State<DailyAttendanceSheet> {
                   elevation: 0,
                 ),
                 child: Text(
-                  "SUBMIT ATTENDANCE",
+                  provider.hasSubmittedToday ? "UPDATE ATTENDANCE" : "SUBMIT ATTENDANCE",
                   style: GoogleFonts.inter(
                     fontWeight: FontWeight.bold,
                     letterSpacing: 1.0,

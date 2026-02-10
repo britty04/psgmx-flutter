@@ -1,3 +1,4 @@
+import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
@@ -636,7 +637,7 @@ class _HomeScreenState extends State<HomeScreen> with UpdateCheckMixin {
         onTap: () => _launchGitHubRepo(context),
         borderRadius: BorderRadius.circular(20),
         child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
           decoration: BoxDecoration(
             gradient: LinearGradient(
               colors: isDark 
@@ -665,16 +666,22 @@ class _HomeScreenState extends State<HomeScreen> with UpdateCheckMixin {
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
+              FaIcon(
+                FontAwesomeIcons.github,
+                size: 16,
+                color: isDark ? Colors.white : const Color(0xFF24292E),
+              ),
+              const SizedBox(width: 8),
               const Icon(
                 Icons.star,
-                size: 18,
+                size: 16,
                 color: Color(0xFFFFD700),
               ),
-              const SizedBox(width: 6),
+              const SizedBox(width: 4),
               Text(
-                'Star on GitHub',
+                '30+',
                 style: GoogleFonts.inter(
-                  fontSize: 12,
+                  fontSize: 13,
                   fontWeight: FontWeight.w600,
                   color: isDark ? Colors.white : const Color(0xFF24292E),
                   letterSpacing: -0.2,

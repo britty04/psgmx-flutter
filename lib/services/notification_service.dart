@@ -554,9 +554,9 @@ class NotificationService extends ChangeNotifier {
     // Schedule daily reminder at 4:45 PM
     await _scheduleDaily(
       id: 300 + teamId.hashCode % 100,
-      title: '📋 Mark Today\'s Attendance',
+      title: '⚠️ Mark Today\'s Attendance',
       body:
-          'Hey Team Leader! Don\'t forget to mark attendance for your team today.',
+          'If you forget to mark attendance for your team, the entire team will be absent..',
       hour: 16,
       minute: 45,
       channel: 'psgmx_attendance',
