@@ -86,18 +86,56 @@ jobs:
           tag_name: ${{ steps.version.outputs.TAG }}
           name: PSGMX ${{ steps.version.outputs.TAG }}
           body: |
-            ## 📱 PSGMX Release ${{ steps.version.outputs.TAG }}
+            ## 🎉 PSGMX Release ${{ steps.version.outputs.TAG }}
 
             ### 📥 Download
             - **Android APK**: `PSGMX-${{ steps.version.outputs.TAG }}-android.apk`
+            
+            ### 🔥 What's New in v2.2.7
+            
+            #### Critical Fixes
+            - ✅ **Fixed POTD Notification Duplicates**: LeetCode Problem of the Day notifications now appear only once
+            - ✅ **Enhanced Team Leader Attendance UI**: Visual status indicators show current attendance state with color-coded switches
+            - ✅ **Attendance Card Status Display**: Shows submission status and marked student count
+            - ✅ **My Tasks for Coordinators/Reps**: Added personal task tracking for Coordinators and Placement Representatives
+            
+            #### Improvements
+            - 🎨 Team Leader attendance card now shows:
+              - 🟢 Green: Already submitted with student count
+              - 🟠 Orange: Not yet submitted
+            - 🔄 Real-time status updates for attendance marking
+            - 📋 Coordinators/Reps can now track their personal daily tasks
+            - 🐛 Fixed notification deduplication logic
 
             ### 📋 Installation
-            1. Download APK
-            2. Enable "Install unknown apps"
-            3. Install & enjoy 🚀
+            1. Download the APK file from assets below
+            2. Enable "Install from Unknown Sources" in Android settings
+            3. Install the APK
+            4. Enjoy the new features! 🚀
+
+            ### 📊 Technical Details
+            - Flutter Version: 3.27.2
+            - Build: Signed Release
+            - Min SDK: 21
+            - Target SDK: 34
+            
+            ### 📝 Database Update Required
+            Run this query on your Supabase database:
+            ```sql
+            UPDATE app_config SET 
+                latest_version = '2.2.7', 
+                force_update = true,
+                update_message = 'Essential Update: Team Leaders can now correct/update today''s attendance. Fixed notification bugs and optimized UI. Kindly update now.',
+                github_release_url = 'https://github.com/brittytino/psgmx-flutter/releases/latest',
+                android_download_url = 'https://github.com/brittytino/psgmx-flutter/releases/download/v2.2.7/PSGMX-v2.2.7-android.apk'
+            WHERE id IS NOT NULL;
+            ```
 
             ### 🌐 Web App
             https://psgmxians.web.app
+            
+            ---
+            **Full Changelog**: https://github.com/${{ github.repository }}/commits/${{ steps.version.outputs.TAG }}
           files: |
             build/app/outputs/flutter-apk/PSGMX-${{ steps.version.outputs.TAG }}-android.apk
           draft: false
